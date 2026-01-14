@@ -11,12 +11,9 @@
      uid: "{{item.uid}}"
      group: "{{item.grupo}}"
      shell: "{{item.shell}}"
-     state: present
-     create_home: yes
     loop: "{{usuarios}}"  
   
   - name: Crear grupos necesarios
     ansible.builtin.group:
      name: "{{item.grupo}}"
-     state: present
     loop: "{{usuarios}}"

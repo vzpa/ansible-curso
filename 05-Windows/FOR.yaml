@@ -1,0 +1,308 @@
+---
+# Windows 11 Forensic Analysis Playbook
+# Análisis completo de seguridad y forense para PC personal
+# Autor: Sistema de diagnóstico automatizado
+# Versión: 1.0
+
+- name: "Windows 11 - Análisis Forense y Seguridad Completo"
+  hosts: windows
+  gather_facts: yes
+  vars:
+    output_dir: "C:\\ForensicAnalysis\\{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}{{ ansible_date_time.minute }}"
+    log_retention_days: 30
+  vars_files:
+    - secrets.yaml
+    
+  tasks:
+    # ===========================sicAnalysis================
+    # PREPARACIÓN DEL ENTORNO
+    # ===========================================
+    - name: "Crear directorio de análisis"
+      win_file:
+        path: "{{ output_dir }}"
+        state: directory
+        
+    - name: "Crear subdirectorios para organizar resultados"
+      win_file:
+        path: "{{ output_dir }}\\{{ item }}"
+        state: directory
+      loop:
+        - "system_info"
+        - "processes"
+        - "network"
+        - "security"
+        - "files"
+        - "registry"
+        - "logs"
+
+    # ===========================================
+    # INFORMACIÓN BÁSICA DEL SISTEMA
+    # ===========================================
+    - name: "Recopilar información básica del sistema"
+      win_shell: |
+        systeminfo > "{{ output_dir }}\system_info\systeminfo.txt"
+        wmic computersystem get model,name,manufacturer,systemtype > "{{ output_dir }}\system_info\hardware.txt"
+        wmic bios get serialnumber,version > "{{ output_dir }}\system_info\bios.txt"
+        Get-ComputerInfo | Out-File "{{ output_dir }}\system_info\computerinfo.txt"
+        
+    - name: "Información de usuarios y sesiones activas"
+      win_shell: |
+        net user > "{{ output_dir }}\system_info\users.txt"
+        query user > "{{ output_dir }}\system_info\active_sessions.txt" 2>$null
+        whoami /all > "{{ output_dir }}\system_info\current_user_privileges.txt"
+
+    # ===========================================
+    # ANÁLISIS DE PROCESOS Y RENDIMIENTO
+    # ===========================================
+    - name: "Análisis detallado de procesos"
+      win_shell: |
+        # Procesos ordenados por uso de CPU y memoria
+        Get-Process | Sort-Object CPU -Descending | Select-Object -First 20 ProcessName, Id, CPU, WorkingSet, Path, Company, ProductVersion | Out-File "{{ output_dir }}\processes\top_cpu_processes.txt"
+        Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 20 ProcessName, Id, CPU, WorkingSet, Path, Company, ProductVersion | Out-File "{{ output_dir }}\processes\top_memory_processes.txt"
+        
+        # Lista completa de procesos con detalles
+        Get-WmiObject -Class Win32_Process | Select-Object ProcessId, Name, CommandLine, ExecutablePath, CreationDate, ParentProcessId | Out-File "{{ output_dir }}\processes\all_processes_detailed.txt"
+        
+        # Servicios del sistema
+        Get-Service | Sort-Object Status, Name | Out-File "{{ output_dir }}\processes\services.txt"
+        
+        # Procesos sin firma digital (potencialmente sospechosos)
+        Get-Process | Where-Object {$_.Path -and (Get-AuthenticodeSignature $_.Path).Status -ne "Valid"} | Select-Object ProcessName, Id, Path | Out-File "{{ output_dir }}\processes\unsigned_processes.txt"
+
+    - name: "Análisis de tareas programadas"
+      win_shell: |
+        Get-ScheduledTask | Where-Object {$_.State -eq "Running" -or $_.State -eq "Ready"} | Select-Object TaskName, State, TaskPath, Actions | Out-File "{{ output_dir }}\processes\scheduled_tasks.txt"
+        
+    - name: "Procesos que se ejecutan al inicio"
+      win_shell: |
+        Get-WmiObject -Class Win32_StartupCommand | Select-Object Name, Command, Location, User | Out-File "{{ output_dir }}\processes\startup_programs.txt"
+        Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run" | Out-File "{{ output_dir }}\processes\registry_startup_hklm.txt"
+        Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" | Out-File "{{ output_dir }}\processes\registry_startup_hkcu.txt"
+
+    # ===========================================
+    # ANÁLISIS DE ARCHIVOS Y UBICACIONES
+    # ===========================================
+    - name: "Archivos abiertos y handles del sistema"
+      win_shell: |
+        # Archivos temporales sospechosos
+        Get-ChildItem -Path $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue | Where-Object {$_.Extension -in @('.exe', '.scr', '.bat', '.cmd', '.ps1')} | Select-Object FullName, CreationTime, LastWriteTime, Length | Out-File "{{ output_dir }}\files\temp_executables.txt"
+        
+        # Archivos recientes
+        Get-ChildItem -Path "C:\Users\*\Recent" -Recurse -Force -ErrorAction SilentlyContinue | Out-File "{{ output_dir }}\files\recent_files.txt"
+        
+        # Archivos en ubicaciones críticas del sistema
+        Get-ChildItem -Path "C:\Windows\System32" -Filter "*.exe" | Where-Object {$_.CreationTime -gt (Get-Date).AddDays(-7)} | Select-Object Name, FullName, CreationTime, LastWriteTime | Out-File "{{ output_dir }}\files\recent_system32_files.txt"
+
+    - name: "Análisis de archivos ejecutables sospechosos"
+      win_shell: |
+        # Archivos .exe en ubicaciones inusuales
+        $suspiciousPaths = @("C:\Users", "C:\ProgramData", "C:\Windows\Temp", "C:\Temp")
+        foreach ($path in $suspiciousPaths) {
+            if (Test-Path $path) {
+                Get-ChildItem -Path $path -Recurse -Include "*.exe", "*.scr", "*.com" -Force -ErrorAction SilentlyContinue | 
+                Select-Object FullName, CreationTime, LastWriteTime, Length, @{Name="Signed";Expression={(Get-AuthenticodeSignature $_.FullName).Status}} |
+                Out-File "{{ output_dir }}\files\executables_in_$(Split-Path $path -Leaf).txt"
+            }
+        }
+
+    # ===========================================
+    # ANÁLISIS DE RED Y CONEXIONES
+    # ===========================================
+    - name: "Conexiones de red activas"
+      win_shell: |
+        netstat -ano > "{{ output_dir }}\network\netstat.txt"
+        Get-NetTCPConnection | Where-Object {$_.State -eq "Established"} | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess | Out-File "{{ output_dir }}\network\established_connections.txt"
+        
+        # Procesos con conexiones de red
+        $connections = Get-NetTCPConnection | Where-Object {$_.State -eq "Established"}
+        foreach ($conn in $connections) {
+            $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+            if ($process) {
+                "$($conn.RemoteAddress):$($conn.RemotePort) <- $($process.Name) ($($process.Id)) - $($process.Path)"
+            }
+        } | Out-File "{{ output_dir }}\network\network_processes.txt"
+
+    - name: "Configuración de firewall y seguridad de red"
+      win_shell: |
+        Get-NetFirewallRule | Where-Object {$_.Enabled -eq $true} | Select-Object DisplayName, Direction, Action, Profile | Out-File "{{ output_dir }}\network\firewall_rules.txt"
+        ipconfig /all > "{{ output_dir }}\network\ipconfig.txt"
+        arp -a > "{{ output_dir }}\network\arp_table.txt"
+
+    # ===========================================
+    # ANÁLISIS DE SEGURIDAD Y ANTIVIRUS
+    # ===========================================
+    - name: "Estado de Windows Defender y antivirus"
+      win_shell: |
+        Get-MpComputerStatus | Out-File "{{ output_dir }}\security\defender_status.txt"
+        Get-MpThreat | Out-File "{{ output_dir }}\security\defender_threats.txt"
+        Get-MpPreference | Out-File "{{ output_dir }}\security\defender_settings.txt"
+        
+        # Historial de escaneos
+        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-Windows Defender/Operational"; Level=2,3,4} -MaxEvents 100 -ErrorAction SilentlyContinue | 
+        Select-Object TimeCreated, Id, LevelDisplayName, Message | Out-File "{{ output_dir }}\security\defender_events.txt"
+
+    - name: "Análisis de actualizaciones y parches de seguridad"
+      win_shell: |
+        Get-HotFix | Sort-Object InstalledOn -Descending | Out-File "{{ output_dir }}\security\installed_updates.txt"
+        
+        # Verificar actualizaciones pendientes
+        if (Get-Module -ListAvailable -Name PSWindowsUpdate) {
+            Get-WUList | Out-File "{{ output_dir }}\security\pending_updates.txt"
+        } else {
+            "Módulo PSWindowsUpdate no instalado - instalar con: Install-Module PSWindowsUpdate" | Out-File "{{ output_dir }}\security\pending_updates.txt"
+        }
+
+    # ===========================================
+    # ANÁLISIS DE REGISTRO DE WINDOWS
+    # ===========================================
+    - name: "Análisis crítico del registro"
+      win_shell: |
+        # Programas instalados
+        Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Out-File "{{ output_dir }}\registry\installed_programs.txt"
+        
+        # Extensiones de shell sospechosas
+        Get-ItemProperty "HKLM:\SOFTWARE\Classes\*\shellex\*" -ErrorAction SilentlyContinue | Out-File "{{ output_dir }}\registry\shell_extensions.txt"
+        
+        # Ejecutables que se cargan con DLLs
+        Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\*" -ErrorAction SilentlyContinue | Out-File "{{ output_dir }}\registry\image_file_options.txt"
+
+    # ===========================================
+    # LOGS DEL SISTEMA
+    # ===========================================
+    - name: "Recopilación de logs críticos"
+      win_shell: |
+        # Logs de seguridad recientes
+        Get-WinEvent -FilterHashtable @{LogName="Security"; Level=2,3} -MaxEvents 200 -ErrorAction SilentlyContinue |
+        Select-Object TimeCreated, Id, LevelDisplayName, Message | Out-File "{{ output_dir }}\logs\security_events.txt"
+        
+        # Logs del sistema
+        Get-WinEvent -FilterHashtable @{LogName="System"; Level=1,2,3} -MaxEvents 200 -ErrorAction SilentlyContinue |
+        Select-Object TimeCreated, Id, LevelDisplayName, Message | Out-File "{{ output_dir }}\logs\system_events.txt"
+        
+        # Logs de aplicaciones con errores
+        Get-WinEvent -FilterHashtable @{LogName="Application"; Level=1,2} -MaxEvents 100 -ErrorAction SilentlyContinue |
+        Select-Object TimeCreated, Id, LevelDisplayName, Message | Out-File "{{ output_dir }}\logs\application_errors.txt"
+
+    # ===========================================
+    # DETECCIÓN DE INDICADORES DE COMPROMISO
+    # ===========================================
+    #- name: "Búsqueda de indicadores de compromiso (IOCs)"
+    #  win_shell: |
+        # Archivos con extensiones dobles sospechosas
+    #    Get-ChildItem -Path "C:\" -Recurse -Include "*.pdf.exe", "*.doc.exe", "*.jpg.exe", "*.txt.exe" -ErrorAction SilentlyContinue |
+    #    Select-Object FullName, CreationTime, LastWriteTime | Out-File "{{ output_dir }}\security\suspicious_double_extensions.txt"
+        
+        # Procesos con nombres de sistema pero en ubicaciones incorrectas
+    #    $systemProcesses = @("svchost.exe", "explorer.exe", "winlogon.exe", "csrss.exe", "lsass.exe")
+    #    foreach ($proc in $systemProcesses) {
+    #        Get-Process -Name $proc -ErrorAction SilentlyContinue | Where-Object {$_.Path -notlike "C:\Windows\*"} |
+    #        Select-Object Name, Id, Path | Out-File "{{ output_dir }}\security\mislocated_system_processes_$proc.txt"
+    #    }
+
+    - name: "Verificación de integridad del sistema"
+      win_shell: |
+        # Ejecutar SFC para verificar integridad
+        sfc /verifyonly > "{{ output_dir }}\security\sfc_verify.txt" 2>&1
+        
+        # DISM para verificar imagen del sistema
+        DISM /Online /Cleanup-Image /CheckHealth > "{{ output_dir }}\security\dism_checkhealth.txt" 2>&1
+
+    # ===========================================
+    # ANÁLISIS DE MEMORIA Y DUMPS
+    # ===========================================
+    - name: "Análisis de memoria y handles"
+      win_shell: |
+        # Información de memoria del sistema
+        Get-WmiObject -Class Win32_PhysicalMemory | Select-Object Capacity, Speed, Manufacturer | Out-File "{{ output_dir }}\system_info\memory_info.txt"
+        
+        # Procesos con alto uso de memoria virtual
+        Get-Process | Where-Object {$_.VirtualMemorySize -gt 500MB} | Select-Object Name, Id, VirtualMemorySize, WorkingSet, Path | Out-File "{{ output_dir }}\processes\high_virtual_memory.txt"
+
+    # ===========================================
+    # GENERACIÓN DE RESUMEN EJECUTIVO
+    # ===========================================
+    - name: "Generar resumen ejecutivo"
+      win_shell: |
+        $summary = @"
+        ================================================
+        RESUMEN EJECUTIVO - ANÁLISIS FORENSE
+        ================================================
+        Fecha de análisis: $(Get-Date)
+        Sistema: $env:COMPUTERNAME
+        Usuario actual: $env:USERNAME
+        
+        ARCHIVOS GENERADOS:
+        - system_info/: Información básica del sistema y hardware
+        - processes/: Análisis detallado de procesos y servicios
+        - network/: Conexiones de red y configuración de firewall
+        - security/: Estado de antivirus y configuración de seguridad
+        - files/: Análisis de archivos ejecutables y ubicaciones críticas
+        - registry/: Configuración crítica del registro
+        - logs/: Logs del sistema y eventos de seguridad
+        
+        REVISIONES RECOMENDADAS:
+        1. Revisar procesos no firmados en: processes/unsigned_processes.txt
+        2. Verificar conexiones establecidas en: network/established_connections.txt
+        3. Comprobar archivos en temp en: files/temp_executables.txt
+        4. Revisar eventos de seguridad en: logs/security_events.txt
+        5. Verificar procesos mal ubicados en: security/mislocated_system_processes_*.txt
+        
+        ACCIONES INMEDIATAS SI SE ENCUENTRAN AMENAZAS:
+        - Desconectar de internet si hay conexiones sospechosas
+        - Ejecutar análisis completo con antivirus actualizado
+        - Verificar integridad del sistema con sfc /scannow
+        - Considerar restauración del sistema a punto anterior
+        
+        ================================================
+        "@
+        $summary | Out-File "{{ output_dir }}\RESUMEN_EJECUTIVO.txt"
+
+    # ===========================================
+    # LIMPIEZA Y OPTIMIZACIÓN OPCIONAL
+    # ===========================================
+    - name: "Generar script de limpieza opcional"
+      win_shell: |
+        $cleanupScript = @'
+        # Script de limpieza opcional - REVISAR ANTES DE EJECUTAR
+        # Eliminar archivos temporales
+        Remove-Item -Path $env:TEMP\* -Recurse -Force -ErrorAction SilentlyContinue
+        
+        # Limpiar caché de DNS
+        ipconfig /flushdns
+        
+        # Limpiar logs antiguos (opcional)
+        # wevtutil cl Application
+        # wevtutil cl System
+        
+        # Ejecutar limpieza de disco
+        cleanmgr /sagerun:1
+        
+        Write-Host "Limpieza completada. Reinicia el sistema para aplicar todos los cambios."
+        '@
+        $cleanupScript | Out-File "{{ output_dir }}\optional_cleanup_script.ps1"
+
+    # ===========================================
+    # NOTIFICACIÓN FINAL
+    # ===========================================
+    - name: "Mostrar ubicación de resultados"
+      debug:
+        msg: |
+          ================================================
+          ANÁLISIS FORENSE COMPLETADO
+          ================================================
+          
+          Los resultados se han guardado en: {{ output_dir }}
+          
+          Archivos clave para revisar:
+          - RESUMEN_EJECUTIVO.txt (empezar aquí)
+          - processes/unsigned_processes.txt
+          - security/defender_status.txt
+          - network/established_connections.txt
+          
+          Para análisis detallado, revisar todos los archivos
+          en los subdirectorios correspondientes.
+          
+          ¡IMPORTANTE!: Este análisis es informativo.
+          Si encuentras algo sospechoso, consulta con un
+          especialista en seguridad antes de tomar acciones.
+          ================================================

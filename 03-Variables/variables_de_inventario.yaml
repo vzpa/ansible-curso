@@ -1,0 +1,15 @@
+---
+- name: Prueba con Variables del fichero de inventario
+  hosts: debian1
+  
+  tasks:
+  - name: Variable local
+    vars:
+      v1: "prueba"
+    debug:
+      msg: "Este valor es local {{v1}}"
+
+  - name: Variable que viene del inventario
+    debug:
+      msg: "Este valor es local {{v2}}"
+  

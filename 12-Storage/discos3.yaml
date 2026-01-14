@@ -1,0 +1,14 @@
+---
+- name: verdatos de los disos con comandos
+  hosts: kali
+
+  tasks:
+
+  - name: Ver los discos a traves de comandos
+    ansible.builtin.shell:
+       cmd: ls /dev/sd*
+    register: discos_comando
+  
+  - name: Mostrar los discos obtenidos por comando
+    ansible.builtin.debug:
+      msg: "{{ discos_comando.stdout | split('\n') }}"

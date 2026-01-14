@@ -1,0 +1,25 @@
+---
+
+- name: Trabajar con vOLUMENES LOGICOS
+  hosts: kali
+  become: true
+  tasks:
+  
+  - name: Crear una particion en el disco /dev/sda
+    community.general.parted:
+      device: /dev/sda
+      number: 3
+      part_start: 10GiB
+      part_end: 15GiB
+      state: present
+
+  - name: Ver el disco
+    community.general.parted:
+      device: /dev/sda
+      state: info
+    register: datos2
+
+
+  - name: Visualizar resultado
+    ansible.builtin.debug:
+      var: datos2

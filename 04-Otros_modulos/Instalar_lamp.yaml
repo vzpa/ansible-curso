@@ -1,0 +1,43 @@
+---
+- name: Instalar LAMP
+  hosts: debian
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Actualizar cache de apt
+      ansible.builtin.apt:
+        update_cache: yes
+      
+
+    - name: Instalar Apache
+      ansible.builtin.apt:
+        name: apache2
+        state: present
+        update_cache: yes
+
+    - name: Instalar MariaDB
+      ansible.builtin.apt:
+        name: mariadb-server
+        state: present
+
+    - name: Instalar PHP
+      ansible.builtin.apt:
+        name: 
+          - php 
+          - libapache2-mod-php
+          - php-mysql
+        state: present
+
+    - name: Reiniciar Apache
+      ansible.builtin.service:
+        name: apache2
+        state: restarted
+    
+    - name: Copiar archivo index.php
+      ansible.builtin.copy:
+        src: recursos/phpinfo.php
+        dest: /var/www/html/phpinfo.php
+        owner: root
+        group: root
+        mode: '0644' 

@@ -1,0 +1,15 @@
+- name: Trabajar con windows. Prar servicio
+  hosts: windows
+  vars_files:
+    - secrets.yaml
+  tasks:
+
+  - name: Parar servicio de Audio
+    ansible.windows.win_service:
+      name: Audiosrv
+      state: stopped
+  
+  - name: subir servicio de Audio
+    ansible.windows.win_service:
+      name: Audiosrv
+      state: started

@@ -1,0 +1,22 @@
+---
+- name: probar vault creando usuarios y passwords
+  hosts: debian1
+  vars_files: vars/usuarios.yaml
+  
+  tasks:
+  - name: Crear usuarios
+    user:
+      name: "{{ item.name }}"
+      password: "{{ item.pass | password_hash('sha512') }}"
+      state: present
+    loop: "{{ usuarios }}"
+  
+  - name: Crear directorios home para los usuarios
+    file:
+      path: "/home/{{ item.name }}"
+      state: directory
+      owner: "{{ item.name }}"
+      group: "{{ item.name }}"
+      mode: '0755'
+    loop: "{{ usuarios }}"
+    

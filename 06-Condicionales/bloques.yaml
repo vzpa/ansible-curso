@@ -1,0 +1,38 @@
+###   BLOQUES  ####
+## 
+## Permiten la agrupación de tareas
+
+---
+- name: Ejemplo de bloques
+  hosts: all
+  
+  tasks:
+  #### PRIMER BLOQUE
+  - name: Instalar y arrancar  MariaDB en Debian
+    block:
+      - name: Instalar MariaDB
+        ansible.builtin.apt: 
+          name: mariadb-server
+          state: present
+       
+      - name: arrancar MariaDB
+        ansible.builtin.service:
+          name: mariadb
+          state: started
+    when: ansible_facts['distribution'] | lower =='debian'     
+    ignore_errors: true
+  
+  #### SEGUNDO BLOQUE
+  - name: Instalar y arrancar  MySQL en Rocky Linux
+    block:
+      - name: Instalar mysql
+        ansible.builtin.yum: 
+          name: mysql-server
+          state: present
+       
+      - name: arrancar Mysql
+        ansible.builtin.service:
+          name: mysqld
+          state: started
+    when: ansible_facts['distribution'] | lower =='rocky'     
+    ignore_errors: true

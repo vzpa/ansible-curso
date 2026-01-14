@@ -1,0 +1,8 @@
+---
+- name: Prueba con Variables desde linea de comandos
+  hosts: debian1
+  
+  tasks:
+  - name: Variables de línea de comandos
+    debug:
+      msg: "En este caso es me has pasado el mensaje: {{mensaje}} " # con --extra-vars "mensaje='esto es una prueba'""

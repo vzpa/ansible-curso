@@ -1,0 +1,19 @@
+---
+- name: Trabajar con windows. variables Fact
+  hosts: windows
+  vars_files:
+    - secrets.yaml
+
+  tasks:
+    
+    - name: Memoria total
+      debug:
+        var: ansible_facts['memtotal_mb']
+    
+    - name: Mostrar version de Windows
+      debug:
+        var: ansible_facts['os_version'] 
+    
+    - name: Mostrar memoria libre
+      debug:
+        var: ansible_facts['memfree_mb']

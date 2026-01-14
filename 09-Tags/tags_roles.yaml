@@ -1,0 +1,17 @@
+---
+- name: Prueba con roles
+  hosts: debian1
+  roles: 
+     - role: desarrollo
+       tags: tag1
+
+  
+  tasks:
+
+  - name: Ejemplo con role
+    import_role:
+      name: Prueba
+    tags: tag2
+    ansible.builtin.debug:
+      msg: Estoy en DEBIAN
+    

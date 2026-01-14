@@ -1,0 +1,202 @@
+---
+# 1- Crear usuario y grupo
+# 2- Instalar JAVA
+# 3- Crear directorio para Tomcat
+# 4- Descargar y decomprimir el software
+# 5- Asociar el usuario y el grupo
+# 6- Crear un fichero para el arranque con SYSTEMD
+# 7- Arrancar el servicio
+- name: Instalar Tomcat 10
+  hosts: servidores_de_aplicaciones
+  become: yes  # ✅ AÑADIDO: Necesario para operaciones administrativas
+  vars:
+    url_descarga: https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.43/bin/apache-tomcat-10.1.43.tar.gz
+    
+  tasks:
+     
+    - name: Actualizar sistema
+      apt:
+        update_cache: yes 
+        cache_valid_time: 3600  # ✅ MEJORADO: Cache válido por 1 hora
+
+    # ✅ CORREGIDO: Crear grupo ANTES que usuario
+    - name: Crear grupo
+      group:
+        name: tomcat
+        state: present
+
+    # ✅ ALTERNATIVA: Verificar si usuario existe y configurarlo solo si es necesario
+    - name: Verificar si usuario tomcat existe
+      shell: id tomcat
+      register: user_exists
+      ignore_errors: yes
+      changed_when: false
+
+    # ✅ MEJORADO: Parar servicios antes de modificar usuario
+    - name: Parar servicio Tomcat si existe
+      systemd:
+        name: tomcat
+        state: stopped
+      ignore_errors: yes
+      when: user_exists.rc == 0
+
+    # ✅ MEJORADO: Terminar procesos del usuario tomcat
+    - name: Terminar procesos del usuario tomcat
+      shell: |
+        pkill -u tomcat 2>/dev/null || true
+        sleep 2
+      ignore_errors: yes
+      when: user_exists.rc == 0
+
+    - name: Crear usuario tomcat
+      user:
+        name: tomcat
+        group: tomcat
+        system: yes
+        shell: /bin/false
+        home: /opt/tomcat
+        create_home: no
+        state: present
+ 
+    - name: Instalar JAVA
+      apt:
+        name: default-jdk
+        state: present
+
+    # ✅ AÑADIDO: Verificar instalación de Java
+    - name: Verificar instalación de Java
+      command: java -version
+      register: java_check
+      changed_when: false
+      failed_when: java_check.rc != 0
+  
+    - name: Crear un directorio para guardar TOMCAT
+      file:
+        path: /opt/tomcat
+        owner: tomcat
+        group: tomcat
+        mode: '0755'  # ✅ MEJORADO: Formato octal correcto
+        state: directory  # ✅ AÑADIDO: Especificar que es directorio
+        recurse: yes
+ 
+    - name: Descargar y descomprimir Tomcat
+      unarchive:
+        src: "{{ url_descarga }}"  # ✅ MEJORADO: Espacios en variables
+        dest: /opt/tomcat
+        remote_src: yes
+        owner: tomcat  # ✅ AÑADIDO: Propietario durante extracción
+        group: tomcat  # ✅ AÑADIDO: Grupo durante extracción
+        extra_opts: [--strip-components=1]
+        creates: /opt/tomcat/bin/startup.sh  # ✅ AÑADIDO: Idempotencia
+ 
+    - name: Cambiar el propietario del directorio de Tomcat
+      file:
+        path: /opt/tomcat
+        owner: tomcat
+        group: tomcat
+        mode: "u+rwx,g+rx,o=rx"
+        recurse: yes
+        state: directory
+
+    # ✅ AÑADIDO: Hacer ejecutables los scripts importantes
+    - name: Hacer ejecutables los scripts de Tomcat
+      file:
+        path: "/opt/tomcat/bin/{{ item }}"
+        mode: '0755'
+        owner: tomcat
+        group: tomcat
+      loop:
+        - startup.sh
+        - shutdown.sh
+        - catalina.sh
+
+    - name: Copiar el WAR de la aplicación
+      copy:
+        src: /home/ansible/ansibleUdemy/practicas/04-Otros_modulos/recursos/ejemplo.war 
+        dest: /opt/tomcat/webapps/
+        owner: tomcat  # ✅ AÑADIDO: Propietario durante copia
+        group: tomcat  # ✅ AÑADIDO: Grupo durante copia
+        mode: '0644'   # ✅ AÑADIDO: Permisos específicos
+    
+    # ✅ ELIMINADA: Tarea redundante, ya se hace en copy anterior
+    # La tarea "Cambiar el propietario del WAR" ya no es necesaria
+
+    # ✅ AÑADIDO: Crear directorio para PID si no existe
+    - name: Crear directorio para archivos temporales
+      file:
+        path: /opt/tomcat/temp
+        state: directory
+        owner: tomcat
+        group: tomcat
+        mode: '0755'
+
+    # ✅ AÑADIDO: Crear directorio de logs si no existe
+    - name: Crear directorio de logs
+      file:
+        path: /opt/tomcat/logs
+        state: directory
+        owner: tomcat
+        group: tomcat
+        mode: '0755'
+    
+    - name: Crear un fichero de servicio
+      copy: 
+        content: |
+          [Unit]
+          Description=Mi Servicio de TOMCAT
+          Wants=network.target
+          After=network.target
+          
+          [Service]
+          Type=forking
+          User=tomcat
+          Group=tomcat
+          
+          Environment=JAVA_HOME=/usr/lib/jvm/default-java
+          Environment=CATALINA_PID=/opt/tomcat/temp/tomcat.pid
+          Environment=CATALINA_BASE=/opt/tomcat
+          Environment=CATALINA_HOME=/opt/tomcat
+          Environment=CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC
+          Environment=JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom
+          
+          ExecStart=/opt/tomcat/bin/startup.sh
+          ExecStop=/opt/tomcat/bin/shutdown.sh
+          
+          SuccessExitStatus=143
+          TimeoutStopSec=10
+          Restart=on-failure
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/tomcat.service
+        mode: '0644'
+      notify: reload systemd
+
+    # ✅ MEJORADO: Usar systemd en lugar de service + más opciones
+    - name: Arrancar y habilitar Tomcat
+      systemd:
+        name: tomcat
+        state: started
+        enabled: yes        # ✅ AÑADIDO: Habilitar en boot
+        daemon_reload: yes  # ✅ AÑADIDO: Recargar daemon
+
+    # ✅ AÑADIDO: Verificar que el servicio esté corriendo
+    - name: Verificar estado del servicio Tomcat
+      systemd:
+        name: tomcat
+      register: tomcat_status
+
+    # ✅ AÑADIDO: Mostrar información útil
+    - name: Mostrar información del servicio
+      debug:
+        msg: 
+          - "Tomcat está {{ 'activo' if tomcat_status.status.ActiveState == 'active' else 'inactivo' }}"
+          - "Para ver logs: journalctl -u tomcat.service -f"
+          - "URL de acceso: http://{{ ansible_default_ipv4.address }}:8080"
+
+  # ✅ AÑADIDO: Handler para recargar systemd
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes

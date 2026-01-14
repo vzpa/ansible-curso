@@ -1,0 +1,14 @@
+---
+- name: Desinstalar ejecutables
+  hosts: windows
+  vars_files:
+    - secrets.yaml
+
+  tasks:
+    - name: Desinstalar GIT
+      ansible.windows.win_package:
+        path: C:\Program Files\Git\unins000.exe
+        arguments:
+          - /VERYSILENT
+          - /NORESTART
+        state: absent

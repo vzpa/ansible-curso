@@ -1,0 +1,24 @@
+---
+- name: Prueba básica con LOOP
+  hosts: debian1
+
+  tasks:
+  - name: Crear varios grupos en el Sistema Operativo
+    ansible.builtin.group:
+     name: "{{item}}"
+     state: present
+    loop:
+       - grupo1
+       - grupo2
+       - grupo3
+
+  - name: Crear varios grupos en el Sistema Operativo
+    vars:
+      grupos:
+        - grupo4
+        - grupo5
+        - grupo6
+    ansible.builtin.group:
+     name: "{{item}}"
+     state: present
+    loop: "{{grupos}}"

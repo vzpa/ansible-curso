@@ -1,0 +1,61 @@
+---
+- name: Trabajar con TAGS multiples
+  hosts: debian1
+  
+  tasks:
+
+  - name: Preparar desarrollo
+    ansible.builtin.debug:
+      msg: Preparar el entorno de desarrollo
+    tags:
+        - desarrollo
+  
+  - name: Preparar test
+    ansible.builtin.debug:
+      msg: Preparar el entorno de test
+    tags:
+        - test
+
+  - name: Preparar producción
+    ansible.builtin.debug:
+      msg: Preparar el entorno de produccion
+    tags:
+       - produccion
+
+  - name: Instalar mysql
+    ansible.builtin.debug:
+      msg: "Instalando mysql"
+    tags:
+      - desarrollo
+      - produccion
+      - test
+
+  - name: Instalar herramientas desarrollo
+    ansible.builtin.debug:
+      msg: "Proceso Terminado"
+    tags:
+        - desarrollo
+
+  - name: Instalar los productos de testing
+    ansible.builtin.debug:
+      msg: "Proceso Terminado"
+    tags:
+        - test
+
+  - name: Instalar la seguridad de producción
+    ansible.builtin.debug:
+      msg: "Instalar el entornod de seguridad"
+    tags:
+       - produccion
+
+  - name: Desplegar aplicacion 
+    ansible.builtin.debug:
+      msg: "Desplegar aplicación"
+    tags:
+      - desarrollo
+      - produccion
+      - test
+      
+  - name: Tarea sin tag
+    ansible.builtin.debug:
+      msg: "Tarea sin tag"

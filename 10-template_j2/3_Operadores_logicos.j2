@@ -1,0 +1,18 @@
+{# Para operadores lógicos se usa
+
+    and 
+    or  
+    not
+   
+#}
+
+
+{% if software=='apache2' or software=='nginx' %}
+     VOY A INSTALAR EL SERVIDOR WEB {{software}}
+{% else %}
+     {% if software=='git' and version==2 %}
+         VOY A INSTALAR {{software}} CON LA VERSION {{version}}
+     {% else %}
+         VOY A INSTALAR {{software}} SIN VERSION
+     {% endif %}
+{% endif %}

@@ -1,0 +1,22 @@
+# Descripción de cada nivel
+# Nivel	Comando	¿Qué muestra?
+# Normal	ansible-playbook	Salida básica (OK, CHANGED, FAILED, etc.)
+# -v	Verbose	Muestra tareas ejecutadas, valores de retorno, paths, etc.
+# -vv	Más verbose	Añade información sobre los módulos usados y detalles adicionales.
+# -vvv	Muy verbose	Muestra variables internas, datos pasados al módulo, argumentos reales, etc.
+# -vvvv	Debug completo	Incluye salida de depuración, solicitudes/respuestas HTTP (WinRM), conexión detallada, etc.
+
+---
+- name: Control de errores
+  hosts: debian
+  #ignore_unreachable: true
+
+  tasks:
+  - name: Visualizar un mensaje
+    ansible.builtin.debug:
+      msg: Mensaje del servidor    
+
+  - name: Visualizar directorio principal
+    ansible.builtin.command:
+      cmd: ls -l /
+    ignore_unreachable: true

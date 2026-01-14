@@ -1,0 +1,25 @@
+---
+- name: Trabajar con el módulos parted
+  hosts: kali
+
+  tasks:
+   
+  - name: Crear una particion en sda
+    community.general.parted:
+      device: /dev/sda
+      number: 1
+      part_end: 5GiB
+      state: present
+    become: true
+   
+
+  
+  - name: Ver datos de /dev/sda
+    community.general.parted:
+      device: /dev/sda
+      state: info
+    register: datos
+      
+  - name: ver los datos part /
+    ansible.builtin.debug:
+      var: datos

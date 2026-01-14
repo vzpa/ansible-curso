@@ -1,0 +1,27 @@
+####  BUCLES
+### Disponemos de varios BUCLES
+#
+#  - loop  Desde la versión 2.5
+#  - whit_<lookup>   whit_items, whit_list,  with_sequence ......
+#  - until
+
+---
+- name: Prueba básica con LOOP
+  hosts: debian1
+
+  tasks:
+  - name: Visualizar contenido con loop
+    ansible.builtin.debug:
+      msg: "{{item}}"    
+    loop:
+       - valor1
+       - valor2
+       - valor3
+
+  - name: Visualizar contenido con with_items
+    ansible.builtin.debug:
+      msg: "{{item}}"    
+    with_items:
+       - valor1
+       - valor2
+       - valor3

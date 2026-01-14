@@ -1,0 +1,26 @@
+---
+- name: Prueba con WHEN. Instalar PHP antiguo
+  hosts: all  # Cambiar a 'all' para usar when en las tareas
+
+  tasks:
+
+  - name: instalar gpg
+    ansible.builtin.apt:
+      name: gpg
+    when: ansible_distribution == "Ubuntu"
+        
+  - name: Actualizar repositorio de php
+    ansible.builtin.shell:
+      cmd: add-apt-repository ppa:ondrej/php -y
+    when: ansible_distribution == "Ubuntu"
+
+  - name: Actualizar cache apt
+    ansible.builtin.apt:
+      update_cache: true
+      force_apt_get: true
+    when: ansible_distribution == "Ubuntu"
+  
+  - name: Instalar version antigua de PHP
+    ansible.builtin.apt:
+      name: php7.4
+    when: ansible_distribution == "Ubuntu"

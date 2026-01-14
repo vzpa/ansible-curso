@@ -1,0 +1,12 @@
+
+---
+- name: Descargar imagen Docker
+  hosts: localhost
+
+  tasks:
+  - name: Crear un contenedor en backgroud
+    community.docker.docker_container:
+      name: contenedor_tomcat
+      image: mi-tomcat
+      state: started
+      detach: true

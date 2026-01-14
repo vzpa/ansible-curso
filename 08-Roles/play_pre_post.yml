@@ -1,0 +1,24 @@
+---
+- name: Ejemplos de un role con handlers y files
+  hosts: debian1
+  roles:
+     - desarrollo #primero se ejecutan las tasks del role
+  # luego se ejecutan las pre_tasks y post_tasks del play
+  
+  # ejecutar antes de las tasks del role
+  pre_tasks:
+  - name: Hacer un Upgrade del sistema
+    ansible.builtin.apt:
+      update_cache: true
+  
+  tasks:
+  # ejecutar después de las tasks del role
+  - name: Ultima tarea del PLAY
+    ansible.builtin.debug:
+      msg: "Se ha instalado el software {{software}}"
+
+
+  post_tasks:
+  - name: Informar de finalzación
+    ansible.builtin.debug:
+      msg: "Proceso Terminado"

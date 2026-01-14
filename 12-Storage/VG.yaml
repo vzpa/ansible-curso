@@ -1,0 +1,23 @@
+---
+
+- name: Trabajar con vOLUMENES LOGICOS
+  hosts: kali
+  become: true
+
+  tasks:
+  
+  - name: Crear un Volume Group en las particiones
+    community.general.lvg:
+      vg: grupo1
+      pvs: 
+        - /dev/sda2
+        - /dev/sda3
+
+  - name: Recuperar informacion de los vg
+    ansible.builtin.shell:
+      cmd: 'vgdisplay | grep "VG Name"'
+    register: datos
+
+  - name: Ver informacion
+    ansible.builtin.debug:
+      var: datos

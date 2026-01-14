@@ -1,0 +1,20 @@
+---
+- name: Trabajar con apache
+  hosts: localhost
+
+  tasks:
+  - name: Crear un contenedor apache
+    community.docker.docker_container:
+      name: apache_ansible
+      image: httpd
+      ports:
+        - 7070:80
+      detach: true
+      volumes:
+        - "/web:/usr/local/apache2/htdocs/"
+  
+  - name: Copiar a /web los recursos de espacio
+    ansible.builtin.copy:
+      src: ./espacio
+      dest: /web
+  

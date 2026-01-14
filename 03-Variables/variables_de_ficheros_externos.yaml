@@ -1,0 +1,14 @@
+---
+- name: Prueba con Variables deficheros externos
+  hosts: debian1
+  vars_files:
+     - recursos/fichero1.yaml
+     - recursos/fichero2.yaml
+  tasks:
+  - name: Variable primer fichero
+    debug:
+      msg: "Este valor es del primer fichero --> {{f1}}"
+
+  - name: Variable del segundo fichero
+    debug:
+      msg: "Este valor es del segundo fichero --> {{f2}}"

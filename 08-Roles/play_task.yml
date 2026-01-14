@@ -1,0 +1,17 @@
+---
+- name: Ejemplos de un role con handlers y files
+  hosts: debian1
+  
+  tasks: 
+
+  - name: Primera tarea del play del PLAY
+    ansible.builtin.debug:
+      msg: "Comienzo el juego"
+  
+  - name: Incluir el role
+    import_role:
+      name: desarrollo
+
+  - name: Ultima tarea del PLAY
+    ansible.builtin.debug:
+      msg: "Se ha terminado el proceso {{software}}"

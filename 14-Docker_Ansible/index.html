@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANSIBLE_CORE // SYSTEM_OVERRIDE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-pink: #ff00ff;
+            --neon-cyan: #00f3ff;
+            --neon-yellow: #fdf000;
+            --dark-bg: #0a0a0b;
+            --card-bg: #151517;
+            --border-glow: 0 0 10px rgba(0, 243, 255, 0.5);
+        }
+
+        * { box-sizing: border-box; }
+        
+        body {
+            background-color: var(--dark-bg);
+            background-image: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                              linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            color: var(--neon-cyan);
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR --- */
+        nav {
+            width: 320px;
+            background: rgba(20, 20, 22, 0.9);
+            border-right: 2px solid var(--neon-pink);
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 5px 0 15px rgba(255, 0, 255, 0.2);
+        }
+
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: var(--neon-yellow);
+            text-shadow: 2px 2px #ff00ff;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        ul { list-style: none; padding: 0; }
+
+        li {
+            padding: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: 0.3s;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        li:hover {
+            background: rgba(0, 243, 255, 0.1);
+            border-left: 3px solid var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+        }
+
+        li.active {
+            background: rgba(255, 0, 255, 0.15);
+            border-left: 3px solid var(--neon-pink);
+            color: white;
+        }
+
+        /* --- CONTENIDO PRINCIPAL --- */
+        main {
+            flex-grow: 1;
+            padding: 40px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .content-section { display: none; }
+        .content-section.active { display: block; animation: flicker 0.5s ease-out; }
+
+        .terminal-window {
+            background: var(--card-bg);
+            border: 1px solid var(--neon-cyan);
+            box-shadow: var(--border-glow);
+            padding: 30px;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .terminal-header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 25px;
+            background: var(--neon-cyan);
+            color: var(--dark-bg);
+            font-weight: bold;
+            font-size: 0.7rem;
+            padding: 5px 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-yellow);
+            text-transform: uppercase;
+        }
+
+        .status-tag {
+            color: var(--neon-pink);
+            font-weight: bold;
+            border: 1px solid var(--neon-pink);
+            padding: 2px 8px;
+            font-size: 0.8rem;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        .practice-box {
+            border: 1px dashed var(--neon-yellow);
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: var(--neon-pink); }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <h2>// CURSO_ANSIBLE_v1.0</h2>
+        <ul id="menu">
+            <li onclick="showSection('s1')">01 INTRODUCCIÓN</li>
+            <li onclick="showSection('s2')">02 INSTALACIÓN</li>
+            <li onclick="showSection('s3')">03 PREPARACIÓN ENTORNO</li>
+            <li onclick="showSection('s4')">04 CONFIGURACIÓN</li>
+            <li onclick="showSection('s5')">05 COMANDOS AD HOC</li>
+            <li onclick="showSection('s6')">06 FICHEROS E INVENTARIOS</li>
+            <li onclick="showSection('s7')">07 PRIMEROS PASOS</li>
+            <li onclick="showSection('s8')">08 VARIABLES</li>
+            <li onclick="showSection('s9')">09 OTROS MÓDULOS</li>
+            <li onclick="showSection('s10')">10 WINDOWS</li>
+            <li onclick="showSection('s11')">11 CONDICIONALES</li>
+            <li onclick="showSection('s12')">12 FILTROS</li>
+            <li onclick="showSection('s13')">13 ROLES (LIBRERÍA)</li>
+            <li onclick="showSection('s14')">14 TAGS</li>
+            <li onclick="showSection('s15')">15 JINJA2</li>
+            <li onclick="showSection('s16')">16 GALAXY & COLECCIONES</li>
+            <li onclick="showSection('s17')">17 ALMACENAMIENTO</li>
+            <li onclick="showSection('s18')">18 ANSIBLE VAULT</li>
+            <li onclick="showSection('s19')" class="active">19 TRABAJA CON DOCKER</li>
+        </ul>
+    </nav>
+
+    <main>
+        <div id="s19" class="content-section active">
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <span>SYSTEM_STATUS: OK // MODULE: DOCKER</span>
+                    <span>X</span>
+                </div>
+                <br>
+                <h1><h1>Esto es una prueba</h1></h1>
+                <p>>_ Desplegando contenedor Nginx mediante Ansible Automation Platform...</p>
+                <span class="status-tag">CONTAINER_RUNNING</span>
+                
+                <div class="practice-box">
+                    <h3 style="color: var(--neon-yellow)">// BUENAS PRÁCTICAS DOCKER_CONTAINER</h3>
+                    <ul>
+                        <li>USE [state: started] para persistencia</li>
+                        <li>USE [published_ports] para mapeo de red</li>
+                        <li>USE [volumes] para persistencia de datos local</li>
+                        <li>USE [networks] para aislamiento de microservicios</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div id="s1" class="content-section">
+            <div class="terminal-window">
+                <h1>01 INTRODUCCIÓN</h1>
+                <p>Editando archivo... Espacio reservado para notas de introducción.</p>
+            </div>
+        </div>
+        </main>
+
+    <script>
+        function showSection(id) {
+            // Ocultar todas las secciones
+            document.querySelectorAll('.content-section').forEach(sec => {
+                sec.classList.remove('active');
+            });
+            // Quitar clase activa del menú
+            document.querySelectorAll('#menu li').forEach(li => {
+                li.classList.remove('active');
+            });
+            // Mostrar la seleccionada
+            document.getElementById(id).classList.add('active');
+            // Activar elemento menú
+            event.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>

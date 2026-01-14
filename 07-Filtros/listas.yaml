@@ -1,0 +1,33 @@
+####  EJEMPLOS CON LISTAS
+---
+- name: Ejemplos varios de filtros con LISTAS
+  hosts: debian1
+  vars:
+       lista_numero:
+         - 2
+         - 10
+         - 9
+         - 1
+       lista_cadena:
+         - Pedro
+         - Juan
+         - Rosa
+         - Antonio
+       cadena: "Esto es una cadena"
+  tasks:
+  
+  - name: Valor menor numero
+    ansible.builtin.debug:
+      msg: "{{lista_numero | min }} --- {{lista_numero | max }} " 
+  
+  - name: Valor menor  cadena
+    ansible.builtin.debug:
+      msg: "{{lista_cadena | min }} --- {{lista_cadena | max }}"
+
+  - name: Unir elementos de una lista
+    ansible.builtin.debug:
+      msg: "{{lista_cadena | join(',')}}" 
+
+  - name: Convertir cadena en lista
+    ansible.builtin.debug:
+      msg: "{{cadena | split()}}" 

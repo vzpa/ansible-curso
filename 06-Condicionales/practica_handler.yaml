@@ -1,0 +1,41 @@
+###   PRACTICA  ####
+## 
+## Vamos hacer un backup del directorio /usr del destino y traer la copia a la máquina de control
+## Tenemos un script llamado backup.sh que hay que copiar al destino y que hace la copia
+## Una vez terminada se genera un fichero llamado "backup.terminado" con  el contenido "Fin de Backup"  
+## Mientras se hace la copia, con un bucle until esperamos a que se genere el fichero con ese texto
+## Cuando se genera, lanzamos un handler para copiar el backup del destino a la maquina de control
+
+---
+- name: Ejemplo con un handler
+  hosts: debian1
+  
+  tasks:
+
+  - name: Copiar el programa de backup al destino
+    ansible.builtin.copy:
+      src: backup.sh
+      dest: /tmp/backup.sh
+      mode: '0744'
+  
+  - name: Lanzar el programa de backup en modo background
+    ansible.builtin.shell: nohup /tmp/backup.sh </dev/null >/dev/null 2>&1 &      
+    
+  - name: Esperar a que termine
+    shell:
+         cmd: cat /tmp/backup.terminado
+    register: result
+    until: result.stdout=="Fin de Backup"     
+    retries: 5
+    delay: 10
+    notify: 
+      - guardar_backup
+
+  handlers:
+  
+  # Traer Backup a la maquina de control
+  - name: guardar_backup
+    ansible.builtin.fetch:
+        src: /tmp/copia.tar 
+        dest: /tmp/copia.tar 
+        flat: true

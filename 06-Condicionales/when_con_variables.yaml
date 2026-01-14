@@ -1,0 +1,14 @@
+---
+- name: Prueba con WHEN. Uso con Variables
+  hosts: debian1
+  vars:
+      ejecutar: True
+
+  tasks:
+  - name: Instalar GIT
+    ansible.builtin.apt:
+     name: git
+     state: present
+    when: not ejecutar # Si ejecutar es False, se ejecuta la tarea 
+          #(otra manera) ejecutar==False
+    

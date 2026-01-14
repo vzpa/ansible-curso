@@ -1,0 +1,24 @@
+---
+- name: Trabajar con TAGS always y never
+  hosts: debian1
+  
+  tasks:
+
+  - name: Con Never
+    ansible.builtin.debug:
+      msg: Etiqueta never
+    tags:
+        - never
+  
+  - name: Con Always
+    ansible.builtin.debug:
+      msg: Etiqueta always
+    tags:
+        - always
+
+  - name: Tarea normal
+    ansible.builtin.debug:
+      msg: tarea normal
+
+    
+        

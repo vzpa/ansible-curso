@@ -1,0 +1,32 @@
+---
+
+- name: ver datos de los discos ansible_facts
+  hosts: kali
+
+  tasks:
+
+  - name: modulo para recopilar devices usando el filtro reject de Jinja 2
+    ansible.builtin.set_fact:
+      dispositivos: "{{ ansible_facts['devices'].keys()  | reject('match','^loop(.*)$') | list }}" 
+
+  - name: Visualizar los dispositivos
+    ansible.builtin.debug:
+     var: dispositivos
+
+  - name: Ver solo los dispositivos sd usando el filtro select  de Jinja 2
+    ansible.builtin.set_fact:
+      discos: "{{ansible_facts['devices'].keys()  | select('match','^sd(.*)$') | list }}"
+  
+  - name: Visualizar los discos
+    ansible.builtin.debug:
+      var: discos
+
+  - name: ver informacion de Particiones
+    ansible.builtin.debug:
+      msg: "Particion {{item}} --> {{ansible_devices[item].partitions}}"
+    loop: "{{discos}}"
+
+  - name: ver nombre de las particiones de cada disco
+    ansible.builtin.debug:
+      msg: "Particion {{item}} --> {{ansible_devices[item].partitions.keys()}}"
+    loop: "{{discos}}"

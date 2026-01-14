@@ -1,0 +1,20 @@
+---
+- name: Insertar un nuevo empleado
+  hosts: debian1
+
+  collections:
+   - community.mongodb
+
+
+  tasks:   
+  - name: Insertar un nuevo empleado en la base de datos MongoDB
+    community.mongodb.mongodb_shell:
+       login_user: admin
+       login_password: admin
+       eval: 'db.Employee.insert({"Employeeid" : 2,"EmployeeName" : "JUan Perez"})'
+       db: db1
+
+  pre_tasks:
+  - name: Se va a insertar un nuevo empleado en la base de datos MongoDB
+    ansible.builtin.debug:
+      msg: "Insertando un nuevo empleado en la base de datos MongoDB"

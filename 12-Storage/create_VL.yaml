@@ -1,0 +1,29 @@
+---
+
+- name: Trabajar con VOLUMENES LOGICOS dentro de un VG
+  hosts: kali
+  become: true
+
+  tasks:
+  - name: Crear un volumen logico en el grupo grupo1
+    community.general.lvol:
+      vg: grupo1
+      lv: vol1
+      size: 512
+
+ 
+  - name: Ver datos del volumen
+    ansible.builtin.shell: 
+     cmd: 'lvdisplay | grep "LV Name"'
+    register: datos
+      
+  - name: ver los datos
+    ansible.builtin.debug:
+      var: datos.stdout_lines
+  
+  - name: ver los datos completos
+    ansible.builtin.debug:
+      var: datos
+
+  
+ 

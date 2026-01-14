@@ -1,0 +1,18 @@
+---
+
+- name: Trabajar con el módulos parted
+  become: true
+  hosts: kali
+
+  tasks:
+
+  - name: Ver datos de sda
+    community.general.parted:
+      device: /dev/sda
+      state: info
+    register: datos
+      
+
+  - name: Visualizar datos de la particion
+    ansible.builtin.debug:
+      var: datos

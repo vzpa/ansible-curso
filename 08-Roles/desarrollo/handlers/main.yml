@@ -1,0 +1,6 @@
+---
+# handlers file for postgres
+- name: reiniciar
+  service:
+        name: "{{servicio}}"
+        state: restarted

@@ -1,0 +1,21 @@
+
+---
+- name: Trabajar con un volumen bind
+  hosts: localhost
+  
+
+  tasks:
+  - name: Crear un contenedor nginx
+    community.docker.docker_container:
+      name: nginx_ansible
+      image: nginx
+      ports:
+        - 9999:80
+      detach: true
+      volumes:
+        - "/datos:/usr/share/nginx/html"
+
+  - name: Copiar a /datos la pagina WEB
+    ansible.builtin.copy:
+      src: index.html
+      dest: /datos

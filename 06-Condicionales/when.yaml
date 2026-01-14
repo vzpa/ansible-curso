@@ -1,0 +1,32 @@
+# WHEN  Condicional básico de Ansible
+# Se trata de una expresión Jinja2
+# No se utilizan doble llaves
+# Se evalua para todos los hosts
+
+
+# Los operadores son los habituales: < > >= <= !=  
+# La comparación es con ==
+# "is defined"  permite saber si una variable existe
+# "not" permite usar la negación
+# para buscar en un array se puede usar el operador "in"
+
+---
+- name: Prueba con WHEN. visualizar la fecha en los debian
+  hosts: all
+
+  tasks:
+  - name: Capturar fecha
+    shell:
+     cmd: date
+    register: fecha
+    when: ansible_distribution=='Debian'
+
+  - name: Visualizar fecha
+    ansible.builtin.debug:
+      msg: "{{fecha.stdout}}"
+    when: ansible_distribution=='Debian'
+ 
+  - name: Visualizar fecha debian o Rocky
+    ansible.builtin.debug:
+      msg: "{{fecha.stdout}}"
+    when: ansible_distribution=='Debian' or ansible_facts['distribution']=='rocky'

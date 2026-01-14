@@ -1,0 +1,39 @@
+---
+- name: Transformar un diccionario en un alista
+  hosts: debian1
+  vars:
+    entorno:
+      proyecto: desarrollo
+      responsable: juan
+      personas: 10
+      sistema: linux
+    
+  tasks:
+  - name: Convertir diccionario a lista
+    ansible.builtin.debug:
+      msg: "{{ entorno | type_debug }}"
+    loop: "{{entorno | dict2items}}"
+      
+    
+  - name: leer un fichero con with_lines
+    ansible.builtin.debug:
+      msg: "{{ item }}"
+    with_lines: cat /etc/passwd
+  
+  - name: Convertir diccionario a lista
+    ansible.builtin.debug:
+      msg: "{{ entorno | dict2items }}"
+
+  - name: separar elementos de una lista de diccionario
+    ansible.builtin.debug:
+      msg: "{{ item.key }}: {{ item.value }}"
+    loop: "{{ entorno | dict2items }}"
+    
+  - name: Unir elementos de una lista
+    ansible.builtin.debug:
+      msg: "{{ entorno | join(',') }}"
+
+  - name: valores unicos 
+    ansible.builtin.debug:
+      msg: "{{ entorno | unique }}"
+

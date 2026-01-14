@@ -1,0 +1,15 @@
+---
+- name: Instalar software
+  hosts: debian2
+  vars_files:
+    - variables_practica_final.yaml
+  
+  tasks:
+  - name: actualizar sistema
+    apt:
+      update_cache: yes
+  - name: Realizar la Desinstalación
+    apt:
+      name: "{{softwareDesin}}"
+      state: absent
+

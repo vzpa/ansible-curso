@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bienvenido — Debian</title>
+  <meta name="description" content="Pantalla de bienvenida para servidores Debian, elegante, minimalista y potente." />
+  <style>
+    :root{
+      --bg1:#0b0b14; /* near-black */
+      --bg2:#250014; /* deep crimson */
+      --ac1:#ef4444; /* red-500 */
+      --ac2:#f472b6; /* pink-400 */
+      --txt:#f3f4f6; /* slate-100 */
+      --glass: rgba(255,255,255,.08);
+      --border: rgba(255,255,255,.12);
+      --glow: 0 0 40px rgba(244,114,182,.35), 0 0 80px rgba(239,68,68,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Inter, "Noto Sans", Ubuntu, Cantarell, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--txt);
+      background:
+        radial-gradient(1200px 800px at 20% -10%, rgba(244,114,182,.22), transparent 60%),
+        radial-gradient(1000px 700px at 110% 90%, rgba(239,68,68,.28), transparent 60%),
+        linear-gradient(120deg, var(--bg1), var(--bg2));
+      overflow:hidden;
+    }
+    /* swirling ribbon */
+    .ribbon{
+      position:fixed; inset:-30vmax; pointer-events:none;
+      background:
+        conic-gradient(from 0deg at 50% 50%, rgba(239,68,68,.15), rgba(244,114,182,.12), rgba(239,68,68,.15));
+      filter: blur(120px) saturate(140%);
+      animation: swirl 22s linear infinite;
+    }
+    @keyframes swirl { to { transform: rotate(360deg) } }
+
+    .wrap{ position:relative; min-height:100%; display:grid; place-items:center; padding: clamp(20px, 4vmin, 48px) }
+    .card{
+      width:min(100%, 960px);
+      border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      backdrop-filter: blur(12px);
+      border-radius: 28px;
+      box-shadow: 0 20px 80px rgba(0,0,0,.45), var(--glow);
+      overflow:hidden;
+    }
+    .head{ display:flex; gap:20px; align-items:center; padding:28px clamp(20px,4vmin,40px); border-bottom:1px solid var(--border);
+           background: linear-gradient(90deg, rgba(239,68,68,.12), transparent); }
+    .logo{ width:64px; height:64px; border-radius:16px; display:grid; place-items:center;
+           background: radial-gradient(circle at 30% 30%, rgba(244,114,182,.3), rgba(239,68,68,.2));
+           box-shadow: inset 0 0 20px rgba(0,0,0,.25), 0 8px 30px rgba(244,114,182,.25);
+    }
+    h1{ margin:0; font-size: clamp(28px, 4.8vmin, 52px); letter-spacing:.2px;
+        background: linear-gradient(90deg, #fff5f5, #fecaca, #fbcfe8);
+        -webkit-background-clip: text; background-clip:text; color: transparent; }
+    .subtitle{ margin:4px 0 0; opacity:.9; font-size: clamp(14px, 1.8vmin, 18px) }
+    .body{ display:grid; gap:22px; padding:24px clamp(20px,4vmin,40px) 36px; }
+    .grid{ display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); }
+    .kpi{ border:1px solid var(--border); border-radius:20px; padding:18px; background: rgba(2,6,23,.5); }
+    .kpi b{ font-size: clamp(18px,2.6vmin,22px) }
+    .btns{ display:flex; flex-wrap:wrap; gap:12px; margin-top:6px }
+    .btn{
+      padding:12px 16px; border-radius:14px; border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(239,68,68,.22), rgba(244,114,182,.15));
+      color:var(--txt); text-decoration:none; font-weight:600; letter-spacing:.3px;
+      transition:.2s transform, .2s box-shadow, .2s filter;
+      box-shadow: 0 10px 24px rgba(239,68,68,.18);
+    }
+    .btn:hover{ transform: translateY(-2px) scale(1.01); box-shadow: 0 12px 28px rgba(244,114,182,.22) }
+    .footer{ padding:18px clamp(20px,4vmin,40px); display:flex; justify-content:space-between; align-items:center; gap:12px;
+             border-top:1px solid var(--border); opacity:.9; font-size:14px; background: linear-gradient(90deg, transparent, rgba(244,114,182,.08)); }
+    code{ padding:.2em .5em; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,.05) }
+    .spin{ animation: spin 14s linear infinite } @keyframes spin{ to{ transform: rotate(360deg) } }
+  </style>
+</head>
+<body>
+  <div class="ribbon" aria-hidden="true"></div>
+  <main class="wrap">
+    <section class="card">
+      <header class="head">
+        <div class="logo spin" aria-hidden="true">
+          <!-- Minimal Spiral SVG (Debian vibe) -->
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none" aria-label="Debian">
+            <path d="M24 8c7.7 0 14 5.8 14 13 0 6.2-5 11-11.2 11-5.3 0-9.6-4-9.6-8.8 0-4.2 3.6-7.6 7.9-7.6 3.8 0 6.9 2.8 6.9 6.2 0 3.1-2.6 5.6-5.8 5.6-2.7 0-4.9-2-4.9-4.5" stroke="#f472b6" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="title">
+          <h1>Servidor Debian listo para despegar 🚀</h1>
+          <p class="subtitle">Estabilidad legendaria, minimalismo elegante. ¡A disfrutar construir!</p>
+        </div>
+      </header>
+
+      <div class="body">
+        <div class="grid">
+          <div class="kpi"><b>Estado:</b><br><span id="estado">Inicializando…</span></div>
+          <div class="kpi"><b>Hora del servidor:</b><br><span id="hora"></span></div>
+          <div class="kpi"><b>Navegador:</b><br><span id="ua"></span></div>
+          <div class="kpi"><b>Kernel (navegador):</b><br><span id="kernel">—</span></div>
+        </div>
+
+        <div class="btns">
+          <a class="btn" href="#" onclick="copy('sudo apt update && sudo apt full-upgrade -y');return false;">Copiar: <code>apt upgrade</code></a>
+          <a class="btn" href="#" onclick="copy('sudo systemctl list-units --type=service --state=running');return false;">Copiar: <code>systemctl</code></a>
+          <a class="btn" href="#" onclick="copy('sudo ufw status verbose');return false;">Copiar: <code>ufw status</code></a>
+          <a class="btn" href="#" onclick="copy('sudo apt install nginx -y && sudo systemctl enable --now nginx');return false;">Instalar NGINX</a>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <span>Tip: coloca este archivo en <code>/var/www/html/index.html</code></span>
+        <span id="motivo">Código que enamora ❤️</span>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const $ = (s)=>document.querySelector(s);
+    function tick(){
+      $('#hora').textContent = new Date().toLocaleString();
+    }
+    setInterval(tick, 1000); tick();
+    $('#ua').textContent = navigator.userAgent;
+    $('#estado').textContent = 'Operativo';
+    // playful spark
+    const frases = [
+      'Precisión suiza 🧭',
+      'Zen y potencia 🧘‍♀️',
+      'Listo para el siguiente nivel 🔺',
+      'Minimalismo que seduce ✨',
+      'Vamos con todo 💪'
+    ];
+    $('#motivo').textContent = frases[Math.floor(Math.random()*frases.length)];
+
+    // fake kernel string just for fun (from UA platform)
+    try{
+      const plt = navigator.platform || '—';
+      $('#kernel').textContent = `Userland: ${plt}`;
+    }catch{}
+
+    function copy(text){
+      navigator.clipboard.writeText(text).then(()=>{
+        $('#motivo').textContent = 'Copiado al portapapeles ✅';
+      });
+    }
+  </script>
+</body>
+</html>

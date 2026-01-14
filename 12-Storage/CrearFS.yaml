@@ -1,0 +1,13 @@
+---
+
+- name: Crear un sistema de ficheros
+  hosts: kali
+
+  tasks:
+  
+  - name: Crear sistema de ficheros
+    community.general.filesystem:
+      dev: /dev/sda1
+      fstype: ext4
+      state: present
+      

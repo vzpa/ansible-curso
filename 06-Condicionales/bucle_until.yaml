@@ -1,0 +1,13 @@
+---
+- name: Until
+  hosts: debian1
+
+  tasks:
+  
+  - name: Repite una tarea has que se cumple la condición
+    ansible.builtin.shell: 
+      cmd: cat /tmp/tarea1
+    register: result
+    until: result.stdout=="Fin de Proceso"
+    retries: 5
+    delay: 2

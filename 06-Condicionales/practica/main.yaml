@@ -1,0 +1,26 @@
+---
+- name: Instalar Software
+  hosts: all
+  vars_files:
+    - Rocky
+    - Debian
+
+  tasks:
+    - name: Instalar paquetes apache, nginx y git en Rocky Linux
+      yum:
+        name:
+          - httpd
+          - nginx
+          - git
+        state: present
+      when: ansible_distribution == "Rocky" 
+    
+    - name: Instalar paquetes apache, nginx y git en Debian/Ubuntu
+      apt:
+        name:
+          - apache2
+          - nginx
+          - git
+        state: present
+        update_cache: yes
+      when: ansible_distribution == "Debian" or ansible_distribution == "Ubuntu"   

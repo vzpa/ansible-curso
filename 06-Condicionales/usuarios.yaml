@@ -1,0 +1,21 @@
+---
+- name: Crear usuarios con bucles
+  hosts: debian1
+  vars_files: /home/ansible/ansibleUdemy/practicas/06-Condicionales/recursos/list_usuario.yaml
+  tasks:
+
+
+  - name: Crear varios usuarios en el Sistema Operativo con un fichero externo
+    ansible.builtin.user:
+     name: "{{item.nombre}}"
+     uid: "{{item.uid}}"
+     group: "{{item.grupo}}"
+     shell: "{{item.shell}}"
+     state: absent
+    loop: "{{usuarios}}"  
+  
+  - name: Crear grupos necesarios
+    ansible.builtin.group:
+     name: "{{item.grupo}}"
+     state: absent
+    loop: "{{usuarios}}"

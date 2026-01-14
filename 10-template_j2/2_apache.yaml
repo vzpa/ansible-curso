@@ -1,0 +1,36 @@
+---
+- name: Trabajar con JINJA2. Montar APACHE
+  hosts: 
+      - debian1
+      - rocky1
+  
+  tasks:
+
+  - name: Instalar Apache
+    ansible.builtin.apt:
+      name: apache2
+      state: present
+    when: ansible_distribution=='Debian' 
+
+  - name: Instalar Apache en Rocky
+    ansible.builtin.yum:
+      name: httpd
+      state: present
+    when: ansible_distribution=='Rocky'
+  
+  - name: copiar pagina WEB  
+    ansible.builtin.template:
+     src: condicionales.j2
+     dest: /var/www/html/index.html
+      
+  - name: arrancar Apache
+    ansible.builtin.service:
+      name: apache2
+      state: started
+    when: ansible_distribution=='Debian' 
+
+  - name: arrancar Apache
+    ansible.builtin.service:
+      name: httpd
+      state: started
+    when: ansible_distribution=='Rocky'

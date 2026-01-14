@@ -1,0 +1,63 @@
+---
+- name: Practica con tags
+  hosts: debian,rocky
+  gather_facts: no
+
+
+  tasks:
+  
+  - name: Actualizar cache en rocky
+    ansible.builtin.yum:
+      update_cache: yes
+    tags:
+      - rocky
+  - name: Actualizar cache en debian
+    ansible.builtin.apt:
+      update_cache: yes
+    tags:
+      - debian
+
+  - name: Instalar Apache en rocky
+    ansible.builtin.dnf:
+      name: httpd
+      state: present
+    tags:
+      - rocky
+
+  - name: Instalar Apache en debian
+    ansible.builtin.apt:
+      name: apache2
+      state: present
+      update_cache: yes
+    tags:
+      - debian
+
+  - name: Iniciar servicio de Apache en rocky
+    ansible.builtin.service:
+      name: httpd
+      state: started
+      enabled: yes
+    tags: 
+      - rocky
+
+  - name: Iniciar servicio de Apache en debian
+    ansible.builtin.service:
+      name: apache2
+      state: started
+      enabled: yes
+    tags: 
+      - debian
+ 
+  - name: Copiar archivo a /var/www/html en rocky
+    ansible.builtin.copy:
+      src: recursos/indexR.html
+      dest: /var/www/html/index.html
+    tags: 
+      - rocky
+
+  - name: Copiar archivo a /var/www/html en debian
+    ansible.builtin.copy:
+      src: recursos/indexD.html
+      dest: /var/www/html/index.html
+    tags: 
+      - debian

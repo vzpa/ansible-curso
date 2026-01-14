@@ -1,0 +1,11 @@
+---
+- name: Descargar imagen Docker
+  hosts: localhost
+  
+
+  tasks:
+  - name: Crear un contenedor con Busybox
+    community.docker.docker_container:
+      name: contenedor1
+      image: busybox
+      state: started

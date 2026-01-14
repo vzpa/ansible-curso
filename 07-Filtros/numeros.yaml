@@ -1,0 +1,24 @@
+####  EJEMPLOS CON NUMROS
+---
+- name: Ejemplos varios de filtros con NUMEROS
+  hosts: debian1
+  vars:
+       numero: 10.40
+       
+  tasks:
+  
+  - name: Potencia
+    ansible.builtin.debug:
+      var: numero | pow(4)
+  
+  - name: Raiz cuadrada
+    ansible.builtin.debug:
+      var: numero  | root()
+  
+  - name: Redonde
+    ansible.builtin.debug:
+      var: numero  | round()
+
+  - name: Nuero aleatorio
+    ansible.builtin.debug:
+      var: numero  | int | random

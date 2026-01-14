@@ -1,0 +1,21 @@
+---
+- name: Primer play
+  hosts: debian1
+  tags: debian
+  
+  tasks:
+
+  - name: Estoy en DEBIAN
+    ansible.builtin.debug:
+      msg: Estoy en DEBIAN
+    
+- name: Segundo play
+  hosts: rocky1
+  tags: rocky
+  
+  tasks: 
+  - name: Estoy en Rocky
+    ansible.builtin.debug:
+      msg: Estoy en Rocky
+  
+  

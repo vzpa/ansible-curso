@@ -1,0 +1,26 @@
+# con fecth copiamos de maquina remota a local
+# con copy copiamos de local a maquina remota
+# con debug mostramos mensajes en pantalla
+# con user creamos usuarios
+# con group creamos grupos
+---
+- name: Otras pruebas con LOOP
+  hosts: debian1
+
+  tasks:
+  - name: Ver las máquinas del inventario
+    ansible.builtin.debug:
+      msg: "{{ item }}"
+    loop: "{{ groups['all'] }}" 
+    register: resultado
+
+  - name: Copiar el resultado en mi debian1
+    ansible.builtin.copy:
+      content: "{{resultado}}"
+      dest: /tmp/resultado.txt
+
+  - name: recuperar fichero
+    ansible.builtin.fetch:
+      src: /tmp/resultado.txt
+      dest: /home/ansible/
+      flat: true # anula el comportamiento por defecto de recuperar los archivos, eliminando la estructura de directorios

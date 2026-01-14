@@ -1,0 +1,19 @@
+---
+- name: Prueba con Variables
+  hosts: debian1
+  vars:
+    mensaje:
+      empresa: Apasoft Training
+      curso: ansible
+      nivel: alto
+      responsables:
+        - Pedro
+        - Raul
+        - responsables
+
+  tasks:
+    - name: Mensaje de bienvenida
+      copy:
+        dest: /etc/motd
+        content: " {{ mensaje.responsables }} y segundo responsable
+         {{ mensaje.responsables[1] }} "

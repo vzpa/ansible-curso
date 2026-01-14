@@ -1,0 +1,15 @@
+usuarios:
+  - nombre: juan
+    uid: 1001
+    grupo: usuarios
+    shell: /bin/bash
+
+  - nombre: maria
+    uid: 1002
+    grupo: desarrolladores
+    shell: /bin/zsh
+
+  - nombre: carlos
+    uid: 1003
+    grupo: administradores
+    shell: /bin/bash

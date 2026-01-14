@@ -1,0 +1,15 @@
+---
+- name: Prueba con WHEN. Ignorar errores
+  hosts: debian1
+
+  tasks:
+  - name: acceder a un firectorio incorrecto
+    ansible.builtin.command:
+     cmd: ls /temporal
+    register: resultado
+    ignore_errors: true
+  
+  - name: Visualizar Resultado
+    ansible.builtin.debug:
+      msg: "{{resultado.stderr}}"
+    when: resultado.stderr !=""

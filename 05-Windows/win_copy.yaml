@@ -1,0 +1,19 @@
+- name: Modulos de Ansible para Windows                                                                                                   
+  hosts: windows    
+  vars_files:
+    - secrets.yaml
+  
+  
+  tasks:
+    - name: Copiar fichero a Windows
+      win_copy:
+        src: recursos/prueba1.txt
+        dest: C:\temp\pruebaansible\prueba1.txt
+
+    - name: mover fichero de rutas en windows
+      win_shell:
+      
+        src: C:\temp\prueba.txt
+        dest: C:\temp\pruebaansible\prueba.txt
+        remote_src: yes
+ 

@@ -1,0 +1,23 @@
+---
+- name: Probar con set_fact
+  hosts: debian1
+  
+  tasks:
+  - name: Crear una variable
+    ansible.builtin.set_fact:
+      fichero: ejemplo.txt
+
+  - name: Usar la variable en un módulo
+    ansible.builtin.file:
+      path: /tmp/{{fichero}}
+      state: touch
+
+  - name: Crear una variable con una expresion
+    ansible.builtin.set_fact:
+      nombre: "{{ansible_facts['hostname'] | upper }}"
+
+  - name: Visualizar la variable
+    ansible.builtin.debug:
+      msg: El nombre de la maquina en mayusculas es {{nombre}}
+  
+  - name: 

@@ -1,0 +1,17 @@
+---
+- name: Prueba con Variables Registradas
+  hosts: debian1
+
+  tasks:
+  - name: Capturar fecha
+    shell:
+     cmd: date
+    register: fecha
+
+  - name: Visualizar fecha
+    ansible.builtin.debug:
+      var: fecha
+  
+  - name: Visualizar fecha
+    ansible.builtin.debug:
+      msg: "{{fecha.stdout}}"

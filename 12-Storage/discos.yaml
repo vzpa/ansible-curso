@@ -1,0 +1,15 @@
+---
+
+- name: ver datos de los discos ansible_facts
+  hosts: kali
+  gather_facts: yes
+
+  tasks:
+
+  - name: modulo para recopilar devices usando el filtro reject de Jinja 2
+    ansible.builtin.set_fact:
+      dispositivos: "{{ ansible_facts['devices'].keys()  | reject('match','^loop(.*)$') | list }}" 
+
+  - name: Visualizar los dispositivos
+    ansible.builtin.debug:
+      var: dispositivos

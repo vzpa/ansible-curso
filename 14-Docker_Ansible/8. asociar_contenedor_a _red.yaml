@@ -1,0 +1,14 @@
+---
+- name: Crear un contenedor asociado a una red
+  hosts: localhost
+
+  tasks:
+  - name: Crear contenedor en red
+    community.docker.docker_container:
+      name: nginx1
+      image: nginx 
+      ports:
+        - 9090:80
+      networks:
+        - name: red1 
+      detach: true

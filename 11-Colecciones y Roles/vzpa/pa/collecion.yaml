@@ -1,0 +1,16 @@
+---
+- name: Probar mi coleccion
+  hosts: debian1
+
+  collections:
+     - apasoft.c1
+
+  tasks: 
+  - name: Llamar al modulo
+    vzpa.pa.modulo:
+      texto: Voy a probar mi coleccion
+    register: v1
+
+  - name: Visualizar la salida
+    ansible.builtin.debug:
+      msg:  "{{v1}}"

@@ -1,0 +1,23 @@
+---
+- name: Instalar MongoDB a través de una colección de Galaxy
+  hosts: debian1
+  roles:
+   - community.mongodb.mongodb_linux
+   - community.mongodb.mongodb_repository
+   - community.mongodb.mongodb_install
+   - community.mongodb.mongodb_mongos
+   - community.mongodb.mongodb_auth
+   
+
+  collections:
+   - community.mongodb
+  
+  pre_tasks:
+  - name: actualizar caché de apt
+    ansible.builtin.apt:
+      update_cache: yes
+  - name: Instalar pymongo
+    ansible.builtin.shell:
+      cmd: pip install pymongo
+
+ 

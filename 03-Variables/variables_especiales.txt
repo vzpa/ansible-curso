@@ -1,0 +1,150 @@
+Variables especiales
+
+Variables mágicas
+El usuario no puede configurar estas variables directamente; Ansible siempre las anulará para reflejar el estado interno.
+
+modo de comprobación ansible
+Booleano que indica si estamos en modo check o no
+
+nombre_de_colección_ansible
+El nombre de la colección de la que forma parte la tarea que se está ejecutando. En el formato denamespace.collection
+
+archivo_de_configuración_ansible
+La ruta completa del archivo de configuración de Ansible utilizado
+
+nombres de roles dependientes de ansible
+Los nombres de los roles actualmente importados en la obra actual como dependencias de otras obras
+
+modo de diferenciación ansible
+Booleano que indica si estamos en modo diff o no
+
+horquillas ansible
+Entero que refleja el número máximo de bifurcaciones disponibles para esta ejecución
+
+variable_índice_ansible
+El nombre del valor proporcionado a loop_control.index_var. Añadido en2.9
+
+fuentes de inventario ansible
+Lista de fuentes utilizadas como inventario
+
+límite ansible
+Contenido de la --limitopción CLI para la ejecución actual de Ansible
+
+bucle ansible
+Un diccionario/mapa que contiene información de bucle extendido cuando se habilita a través deloop_control.extended
+
+variable_de_bucle_ansible
+El nombre del valor proporcionado a loop_control.loop_var. Añadido en2.8
+
+nombres de roles parentales de ansible
+Cuando el rol actual se ejecuta mediante una acción include_role o import_role , esta variable contiene una lista de todos los roles principales, siendo el rol más reciente (es decir, el rol que lo incluyó o importó) el primero. Si se incluyen varias veces, esta lista muestra el último rol (es decir, el rol que lo incluyó) como el primero . También es posible que un rol específico aparezca más de una vez en esta lista.
+
+Por ejemplo: Si el rol A incluye el rol B , dentro del rol B, ansible_parent_role_namesserá igual a ['A']. Si el rol B incluye el rol C , la lista se convierte en .['B', 'A']
+
+rutas de rol principal de ansible
+Cuando el rol actual se ejecuta mediante una acción include_role o import_role , esta variable contiene una lista de todas las rutas de los roles principales, siendo el rol más reciente (es decir, el rol que lo incluyó o importó) el primero. Consulte ansible_parent_role_namesel orden de los elementos en esta lista.
+
+lote de reproducción ansible
+Lista de hosts activos en la partida actual, limitada por el número de serie (también conocido como "lote"). Los hosts fallidos o inaccesibles no se consideran "activos".
+
+ansible_play_hosts
+Lista de hosts en la partida actual, sin límite de serie. Los hosts fallidos o inaccesibles quedan excluidos de esta lista.
+
+ansible_play_hosts_all
+Lista de todos los anfitriones que fueron blanco de la obra
+
+nombre_de_reproducción_ansible
+Nombre de la jugada que se está ejecutando actualmente. Se agregó en 2.8. ( Atributo de nombre de la jugada, no nombre de archivo del libro de jugadas).
+
+nombres de roles de juego de ansible
+Los nombres de los roles importados actualmente en la obra actual. Esta lista no contiene los nombres de roles incluidos implícitamente mediante dependencias.
+
+libro de jugadas ansible_python
+La ruta al intérprete de Python que utiliza Ansible en el nodo de control
+
+nombre_de_rol_ansible
+El nombre del rol de colección completamente calificado, en el formato denamespace.collection.role_name
+
+nombres_de_roles_ansible
+Los nombres de los roles importados actualmente en la obra actual, o roles referenciados como dependencias de los roles importados en la obra actual.
+
+etiquetas de ejecución de ansible
+Contenido de la --tagsopción CLI, que especifica las etiquetas que se incluirán en la ejecución actual. Tenga en cuenta que si --tagsno se pasa, esta variable se establecerá como ["all"].
+
+ruta de búsqueda ansible
+Ruta de búsqueda actual para complementos de acción y búsquedas, en otras palabras, donde buscamos rutas relativas cuando lo hacestemplate: src=myfile
+
+etiquetas de salto ansible
+Contenido de la --skip-tagsopción CLI, que especifica qué etiquetas se omitirán durante la ejecución actual.
+
+verbosidad_ansible
+Configuración de verbosidad actual para Ansible
+
+versión_ansible
+Diccionario/mapa que contiene información sobre la versión actual en ejecución de ansible, tiene las siguientes claves: completa, mayor, menor, revisión y cadena.
+
+nombres de grupo
+Lista de grupos de los que forma parte el host actual, siempre refleja inventory_hostnamee ignora la delegación.
+
+grupos
+Un diccionario/mapa con todos los grupos en inventario y cada grupo tiene la lista de hosts que le pertenecen
+
+variables de host
+Un diccionario/mapa con todos los hosts en inventario y las variables asignadas a ellos
+
+directorio_de_inventario
+El directorio de la fuente de inventario donde se definió por primera vez el nombre_de_host_del_inventario . Esto siempre refleja la inventory_hostnamedelegación y la ignora.
+
+nombre_de_host_del_inventario
+El nombre del inventario del host "actual" que se itera en la ejecución. No se ve afectado por la delegación; siempre refleja el host original de la tarea.
+
+nombre_de_host_de_inventario_corto
+La versión abreviada de inventory_hostname es la primera sección después de dividirla mediante .. Por ejemplo, para inventory_hostnameof www.example.com, wwwsería . inventory_hostname_short Esto se ve afectado por la delegación, por lo que reflejará el nombre corto del host delegado.
+
+archivo de inventario
+El nombre del archivo de la fuente de inventario donde se definió por primera vez el nombre_de_host_del_inventario . Ignora la delegación y siempre refleja la información del archivo inventory_hostname.
+
+omitir
+Variable especial que permite 'omitir' una opción en una tarea, por ejemplo- user: name=bob home={{ bobs_home|default(omit) }}
+
+anfitriones de juego
+Obsoleto, lo mismo que ansible_play_batch
+
+directorio_del_libro_de_jugadas
+Ruta al directorio del libro de estrategias que se está ejecutando. NOTA: Puede ser diferente del directorio del libro de estrategias que se pasa a la ansible-playbooklínea de comandos cuando un libro de estrategias contiene una import_playbookinstrucción.
+
+nombre_del_rol
+El nombre del rol que se está ejecutando actualmente.
+
+nombres_de_roles
+Obsoleto, lo mismo que ansible_play_role_names
+
+ruta_de_rol
+La ruta al directorio del rol que se está ejecutando actualmente
+
+Hechos
+Estas son variables que contienen información pertinente al host actual ( inventory_hostname ). Solo están disponibles si se recopilan primero. Consulte Descubriendo variables: datos y variables mágicas para obtener más información.
+
+datos_ansible
+Contiene todos los datos recopilados o almacenados en caché para inventory_hostname . Los datos normalmente son recopilados por el módulo de configuración de manera automática en una reproducción, pero cualquier módulo puede devolver datos.
+
+ansible_local
+Contiene los datos locales recopilados o almacenados en caché para inventory_hostname . Las claves disponibles dependen de los datos personalizados creados. Consulta el módulo de configuración y facts.d o datos locales para obtener más información.
+
+Variables de conexión
+Las variables de conexión se utilizan normalmente para especificar cómo ejecutar acciones en un objetivo. La mayoría corresponden a plugins de conexión, pero no todas son específicas de ellos; otros plugins, como shell, terminal y become, suelen estar involucrados. Solo se describen las más comunes, ya que cada plugin de conexión, de Become, de shell, etc., puede definir sus propias anulaciones y variables específicas. Consulte " Controlar el comportamiento de Ansible: reglas de precedencia para la interacción de las variables de conexión con los ajustes de configuración , las opciones de la línea de comandos y las palabras clave del playbook" .
+
+ansible_convertirse_en_usuario
+El usuario Ansible se convierte en usuario tras usar la escalada de privilegios. Esto debe estar disponible para el usuario que inicia sesión.
+
+conexión ansible
+El complemento de conexión realmente utilizado para la tarea en el host de destino.
+
+host ansible
+La IP/nombre del host de destino que se utilizará en lugar de inventory_hostname .
+
+intérprete de ansible_python
+La ruta al ejecutable de Python que Ansible debe usar en el host de destino.
+
+usuario_ansible
+El usuario Ansible 'inicia sesión' como.

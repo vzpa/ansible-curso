@@ -1,0 +1,32 @@
+[debian]
+debian1 #software=apache
+debian2
+
+#[rocky][debian:vars]
+#puerto=9090
+#ansible_user=pepe
+
+
+[rocky]
+rocky1
+rocky2
+
+[ubuntu]
+ubuntu1 #puerto=9090 #entorno=desarrollo #ansible_user=pepe
+
+
+[servidores_de_datos]
+mysql1
+mysql2
+
+[servidores_de_aplicaciones]
+tomcat1
+tomcat2
+
+
+#[desarrollo:children]
+#debian
+#ubuntu
+
+#[desarrollo:vars]
+#ansible_user=JUanpa

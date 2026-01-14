@@ -1,0 +1,12 @@
+---
+- name: Prueba con Variables FACT
+  hosts: servidores_de_aplicaciones
+  
+  tasks:
+  - name: Ver variables FACT
+    debug:
+      msg: "Arquitectura  {{ansible_facts.architecture}} {{ansible_facts['bios_vendor']}} {{ansible_facts['all_ipv4_addresses'][0]}} "
+
+  - name: Usar diccionarios FACT
+    debug:
+      var: ansible_facts.date_time.day

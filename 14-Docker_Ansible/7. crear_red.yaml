@@ -1,0 +1,12 @@
+---
+- name: Descargar imagen Docker
+  hosts: localhost
+  
+
+  tasks:
+  - name: Crear una red de Docker
+    community.docker.docker_network:
+      name: red1
+      ipam_config:
+        - subnet: 172.3.0.0/16
+          gateway: 172.3.2.1

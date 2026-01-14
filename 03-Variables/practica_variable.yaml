@@ -1,0 +1,44 @@
+---
+- name: Prueba con Variables
+  hosts: debian1
+  vars:
+    mensaje:
+      - "               .-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-."
+      - "              /        [ NODE: vzpa-lab01 ]        \\"
+      - "             /-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\\"
+      - "            |       _   _ _____ _____   ____  ____    |"
+      - "            |      | \\ | | ____|_   _| |  _ \\|  _ \\   |"
+      - "            |      |  \\| |  _|   | |   | | | | |_) |  |"
+      - "            |      | |\\  | |___  | |   | |_| |  __/   |"
+      - "            |      |_| \\_|_____| |_|   |____/|_|      |"
+      - "             \\                                     /"
+      - "              \\      “Knowledge is sacred.        /"
+      - "               \\     Access is responsibility.”  /"
+      - "                `-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-`"
+      - ""
+      - "───────────────────────────────────────────────────────────────"
+      - " [User]     : jp.vzpa"
+      - " [Hostname] : vzpa-lab01"
+      - " [Uptime]   : up 3 hours, 42 minutes"
+      - " [Date]     : Tuesday, 29 July 2025 - 20:17:42"
+      - " [IP Addr]  : 192.168.99.21"
+      - "───────────────────────────────────────────────────────────────"
+      - ""
+      - "  \"In a world of noise, we are the signal."
+      - "   In the shadows of the net, we are the light."
+      - "   We do not exploit—we defend."
+      - "   We do not invade—we explore."
+      - "   We do not guess—we learn.\""
+      - ""
+      - "  ∴ Rooted in truth. Forged in code. Aligned with purpose. ∴"
+      - ""
+      - "───────────────────────────────────────────────────────────────"
+      - ""
+      - "   Terminal initialized. All transmissions are logged."
+      - "   Proceed with awareness. Leave no trace, except wisdom."
+
+  tasks:
+    - name: Mensaje de bienvenida
+      copy:
+        dest: /etc/motd
+        content: "{{mensaje[0:18]  | join('\n') }}"

@@ -1,0 +1,16 @@
+- name: Montar un sistema de ficheros
+  hosts: localhost
+
+  tasks:
+  
+  - name: Crear punto de montaje
+    ansible.builtin.file:
+      path: /datos
+      state: directory
+
+  - name: Montar el sistema de ficheros
+    ansible.posix.mount:
+     path: /datos
+     src: /dev/sda2
+     fstype: ext4
+     state: mounted

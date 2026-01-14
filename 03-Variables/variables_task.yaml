@@ -1,0 +1,22 @@
+---
+- name: Prueba con Variables
+  hosts: debian1
+  vars:
+    - v1: "varialbe global" #La variable mas local es la que prevalece
+    
+  tasks:
+  - name: Variable local
+    vars:
+      v1: "prueba"
+    debug:
+      msg: "Este valor es local {{v1}}"
+
+  - name: Variable local 2
+    vars:
+       v1: "adios"
+    debug:
+      msg: "Este valor es local {{v1}}"
+  
+  - name: Variable local 3 # La sacara de la variable global
+    debug:
+      msg: "Este valor es local {{v1}}"

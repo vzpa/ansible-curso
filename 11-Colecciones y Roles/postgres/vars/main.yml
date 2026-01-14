@@ -1,0 +1,10 @@
+---
+# vars file for postgres
+postgres_version: 13
+path: /datos
+owner: postgres
+password_postgres: "postgres"
+group: postgres
+dest: /tmp
+name_script: crear_usuario_y_bd.sql
+absolutate_path_script: "{{ dest }}/{{ name_script }}"

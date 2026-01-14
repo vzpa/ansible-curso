@@ -1,0 +1,42 @@
+# tasks file for postgres
+- name: Instalar version 13 de postgresql
+  apt:
+    name: "postgresql-{{ postgres_version }}"
+   
+
+- name: crear directorio para tablespace si existe
+  file:
+    path: "{{ path }}"
+    state: absent
+
+- name: Dar permisos al usuario postgres sobre el directorio
+  file:
+    path: "{{ path }}"
+    owner: "{{ owner }}"
+    group: "{{ group }}"
+    state: directory
+    mode: '0700'
+
+#- name: Inicializar la bases de datos de postgresql en el directorio /datos
+  command: "/usr/lib/postgresql/{{ postgres_version }}/bin/initdb -D {{ path }}"
+#  become: yes
+  become_user: "{{ owner }}"
+
+- name: Habilitar postgresql para que inicie con el sistema
+  systemd:
+    name: postgresql
+    enabled: true
+    state: started
+
+- name: Copiar script para crear usuario y BBDD
+  copy:
+    src: "{{ name_script }}"
+    dest: "{{absolutate_path_script}}"
+    owner: "{{ owner }}"
+    group: "{{ group }}"
+    mode: '0744'
+
+#- name: Lanzar script para crear usuario y BBDD
+  command: "psql -f {{absolutate_path_script}}"
+#  become: yes
+  become_user: "{{ owner }}"

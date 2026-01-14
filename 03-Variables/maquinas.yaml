@@ -1,0 +1,24 @@
+all:
+  hosts:
+    ubuntu1:
+      #puerto: 9000
+      #entorno: desarrollo
+      #ansible_user: pepe
+  children:
+    debian:
+      hosts:
+        debian1:
+        debian2:
+      vars:
+        #ansible_user: JUanpa
+    rocky:
+      hosts:
+        rocky1:
+        rocky2:
+    servidores_de_datos:
+      hosts:
+        mysql1:
+    servidores_de_aplicaciones:
+      hosts:
+        tomcat1:
+        tomcat2:

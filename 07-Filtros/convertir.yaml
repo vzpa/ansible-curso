@@ -1,0 +1,38 @@
+---
+- name: Ejemplos varios de filtros
+  hosts: all
+  vars:
+       cadena: "true"
+       numero: 10
+       verdad: true
+       lista:
+          - pepe
+          - juan
+          - antonio
+       lista1: ['pepe','juan','antonio']  
+       diccionario:
+           nombre: juan
+           edad: 27  
+ 
+  tasks:
+  
+  - name: Convertir a cadena
+    ansible.builtin.debug:
+      var: numero 
+
+  - name: Convertir a cadena
+    ansible.builtin.debug:
+      var: numero | string 
+
+  - name: Convertir a entero
+    ansible.builtin.debug:
+      var: cadena | int
+
+  - name: Convertir a entero
+    ansible.builtin.debug:
+      var: cadena | bool
+
+  - name: visualizar version conversión de cadena a entero
+    ansible.builtin.debug:
+      msg: "{{ansible_facts['distribution_version']}}"
+    when: ansible_distribution_version | int > 10

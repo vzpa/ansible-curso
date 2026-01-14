@@ -1,0 +1,26 @@
+###   HANDLERS  ####
+## 
+## se utiliza para invocar una determinada tarea 
+## Se usa el comando notify
+## Se ejecutan despues de todas las tareas del PLAY
+## No pueden repetirse nombres en el playbook, ya que son globales
+## Solo se ejecutan una vez, aunque haya 2 tareas que los invoquen
+
+---
+- name: Ejemplo con un handler
+  hosts: debian1
+  
+  tasks:
+  - name: Copiar index1.html a /var/www/html
+    ansible.builtin.copy:
+      src: index1.html
+      dest: /var/www/html
+    notify: 
+      - rebotar_apache
+
+  handlers:
+  - name: rebotar_apache
+    ansible.builtin.service:
+        name: apache2
+        state: restarted
+       

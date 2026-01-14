@@ -1,0 +1,33 @@
+###   BLOQUES  ####
+## 
+## Permiten la agrupación de tareas
+##  RESCUE --> Tareas a ejecutar cuando falla un bloques
+##  ALWAYS --> Se ejecuta la tarea independientemente de la salida del bloque
+
+---
+- name: Ejemplo de control de bloques
+  hosts: debian1
+  
+  tasks:
+  #### PRIMER BLOQUE
+  - name: Ejemplo control
+    block:
+      - name: Programa que falla
+        ansible.builtin.shell: 
+          cmd: ls /tmp/no_existe.txt
+      
+      - name: Esto no llega a pintarse  
+        ansible.builtin.debug:
+          msg: "He terminado"
+
+  #### RESCUE
+    rescue:
+    - name: Imprimir errores
+      ansible.builtin.debug:
+        msg: " Se ha producido un error"
+    
+
+    always:
+    - name: Siempre se ejecuta
+      ansible.builtin.debug:
+        msg: " Siempre me ejecuto"

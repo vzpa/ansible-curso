@@ -1,0 +1,15 @@
+---
+- name: Prueba con Variables
+  hosts: debian1
+  vars: 
+    - entornos: #Lista
+       - desarrollo
+       - testing
+       - produccion
+    - responsables: ["pepe","juan","Rosa"] #Array
+  
+
+  tasks:
+  - name: Ver variables
+    debug:
+      msg: "Entornos disponibles {{entornos}} {{entornos[0]}} {{entornos[0:2]}}  {{responsables}}"

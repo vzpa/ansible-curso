@@ -1,0 +1,8 @@
+---
+# vars file for postgres
+software: postgresql
+servicio: postgresql
+usuario: postgres
+password: postgres
+directorio: /datos
+fichero: crear_bd_usu.sql

@@ -1,0 +1,33 @@
+---
+- name: Trabajar con lineinfile #Modulo lineinfile
+  hosts: ubuntu1
+      
+  tasks:
+  - name: Copiar un fichero sencillo de ejemplo
+    copy:
+      src: /home/ansible/ansibleUdemy/practicas/04-Otros_modulos/recursos/ejemplo.txt
+      dest: /tmp/ejemplo.txt
+
+  - name: Añadir un línea al fichero
+    ansible.builtin.lineinfile:
+      path: /tmp/ejemplo.txt
+      line: linea 4
+
+  - name: Cambiar la línea1
+    ansible.builtin.lineinfile:
+      path: /tmp/ejemplo.txt
+      search_string: linea 1
+      line: He cambiado la linea 1
+
+  - name: Borrar la línea 2
+    ansible.builtin.lineinfile:
+      path: /tmp/ejemplo.txt
+      search_string: linea 2
+      state: absent
+
+  - name: Reemplazar la linea 4
+    ansible.builtin.lineinfile:
+      path: /tmp/ejemplo.txt
+      regexp: '^linea 4'
+      line: "Cambiado con REGEX"
+  

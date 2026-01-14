@@ -1,0 +1,11 @@
+---
+- name: Ejemplos de un role con handlers y files
+  hosts: debian1
+  roles:
+     - desarrollo
+  
+  tasks:
+
+  - name: Ultima tarea
+    ansible.builtin.debug:
+      msg: "Se ha instalado el software {{software}}"

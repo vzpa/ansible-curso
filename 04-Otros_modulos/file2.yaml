@@ -1,0 +1,42 @@
+---
+- name: Trabajar con ficheros
+  hosts: debian
+  vars:
+    - fichero: /tmp/prueba1.txt
+      
+  tasks:
+  - name: Crear un fichero vacío
+    file:
+      path: "{{fichero}}"
+      state: "touch"
+
+  - name: cambiar persmisos y propietario
+    file: 
+      path: "{{fichero}}"
+      owner: ansible
+      group: ansible
+      mode: '0777'
+      
+      # FIlE 3
+
+    
+- name: Trabajar con directorios
+  hosts: ubuntu
+  vars:
+    directorio: /tmp/dir1
+
+  tasks:
+  - name: Crear directorio
+    file:
+      path: "{{directorio}}"
+      state: directory
+      mode: '0755'
+  - name: Crear fichero
+    file:
+      path: "{{directorio}}/p1.txt"
+      state: touch
+  - name: Borrar directorio
+    file:  
+      path: "{{directorio}}"
+      state: "absent"
+...

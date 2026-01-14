@@ -1,0 +1,8 @@
+- name: Probar conexión a Windows con credenciales cifradas
+  hosts: windows
+  vars_files:
+    - secrets.yaml
+  tasks:
+    - name: Hacer ping a máquina Windows
+      win_ping:
+

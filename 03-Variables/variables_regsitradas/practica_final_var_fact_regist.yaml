@@ -1,0 +1,39 @@
+---
+- name: Variables Registradas
+  hosts: rocky
+
+  tasks:
+
+
+
+  - name: Actualizar todos los paquetes del sistema
+    yum:
+      name: '*'
+      state: latest
+      update_cache: yes
+
+  - name: Realizar la instalación de Mysql
+    yum:
+      name: mysql-server
+      state: present
+    register: instalar_mysql
+
+  - name: Visualización del resultado de instalar Mysql
+    ansible.builtin.debug:
+      var: instalar_mysql
+
+  - name: Arrancar Mysql
+    service:
+      name: mysqld
+      state: started
+    register: arrancar_mysql
+
+  - name: Visualización del resultado de arrancar Mysql
+    ansible.builtin.debug:
+      var: arrancar_mysql
+  
+  - name: Asegurar que el servicio SSH esté corriendo
+    ansible.builtin.service:
+      name: sshd
+      state: started
+      enabled: yes

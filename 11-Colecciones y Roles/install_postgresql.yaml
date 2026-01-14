@@ -1,0 +1,17 @@
+---
+- name: Instalar postgresql
+  hosts: debian1
+
+  roles:
+    - postgres
+  
+  pre_tasks:
+  - name: Instalar node.js
+    ansible.builtin.debug:
+      msg: "Se va instalar postgresql a través del rol postgres"
+  
+  - name: Update apt cache
+    ansible.builtin.apt:
+      update_cache: yes
+      cache_valid_time: 3600
+  

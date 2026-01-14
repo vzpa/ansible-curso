@@ -1,0 +1,24 @@
+---
+- name: Crear un sistema de ficheros
+  hosts: kali
+  become: true
+
+  tasks:
+  
+  - name: Crear sistema de ficheros
+    community.general.filesystem:
+      dev: /dev/grupo1/vol1
+      fstype: ext4
+      state: present
+
+  - name: Crear un punto de montaje
+    ansible.builtin.file:
+      path: /documentos
+      state: directory
+
+  - name: Montar el sistema de ficheros
+    ansible.posix.mount:
+      path: /documentos
+      src: /dev/grupo1/vol1
+      fstype: ext4
+      state: mounted

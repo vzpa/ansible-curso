@@ -1,0 +1,39 @@
+---
+- name: Trabjar con wordpress
+  hosts: localhost
+
+  tasks:
+  - name: Crear una red2 para wordpress
+    community.docker.docker_network:
+      name: red2
+      ipam_config:
+        - subnet: 172.3.0.0/16
+          gateway: 172.3.2.1
+
+  - name: exponer el puerto 8000 para wordpress
+    community.docker.docker_container:
+      name: wordpress_wp
+      image: wordpress
+      ports:
+        - 8000:80
+      detach: true
+      env:
+        WORDPRESS_DB_HOST: "mariadb_wp:3306"
+        WORDPRESS_DB_USER: "wp_user"
+        WORDPRESS_DB_PASSWORD: "lepanto"
+        WORDPRESS_DB_NAME: "wordpress_db"
+      networks:
+        - name: red2
+  
+  - name: Crear un contenedor mariadb para wordpress
+    community.docker.docker_container:
+      name: mariadb_wp
+      image: mariadb
+      detach: true
+      env:
+        MARIADB_ROOT_PASSWORD: "lepanto"
+        MARIADB_DATABASE: "wordpress_db"
+        MARIADB_USER: "wp_user"
+        MARIADB_PASSWORD: "lepanto"
+      networks:
+        - name: red2

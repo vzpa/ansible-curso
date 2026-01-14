@@ -1,0 +1,19 @@
+---
+- name: Instalar paquetes en Windows
+  hosts: windows
+  vars_files:
+    - secrets.yaml
+
+  tasks:
+    - name: Descargar GIT
+      ansible.windows.win_get_url:  
+        url: https://github.com/git-for-windows/git/releases/download/v2.50.1.windows.1/Git-2.50.1-64-bit.exe
+        dest: C:\temp\Git-2.50.1-64-bit.exe
+
+    - name: Instalar GIT
+      ansible.windows.win_package:                        
+        path: C:\temp\Git-2.50.1-64-bit.exe
+        state: present
+        arguments: 
+          - /VERYSILENT 
+          - /NORESTART

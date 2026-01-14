@@ -1,0 +1,11 @@
+---
+- name: Descargar imagen Docker
+  hosts: localhost
+
+  tasks:
+  - name: Crear un contenedor interactivo con Debian
+    community.docker.docker_container:
+      name: contenedor_debian
+      image: debian
+      state: started
+      interactive: true

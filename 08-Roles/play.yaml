@@ -1,0 +1,24 @@
+####  VARIABLES
+
+#####  precedencia
+#  en el defaults del role
+#  en groups_var
+#  en hosts_vars
+#  en plays
+#  en el vars del role
+#  desde línea de comandos
+
+
+---
+- name: Ejemplos de un role
+  hosts: debian1
+  roles:
+     - desarrollo
+  vars:
+     software: apache2
+     servicio: apache2
+  tasks:
+
+  - name: Ultima tarea
+    ansible.builtin.debug:
+      msg: "Se ha instalado el software {{software}}"

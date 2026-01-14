@@ -1,0 +1,45 @@
+---
+# tasks file for postgres
+- name: Instalar PostgreSQL
+  apt:
+      name: "{{software}}"
+      state: latest
+
+- name: Crear el directorio para la Base de Datos
+  ansible.builtin.file:
+      path: "{{directorio}}"
+      state: absent
+    
+- name: dar permisos de usuario y grupo al directorio
+  ansible.builtin.file:
+        path: "{{directorio}}"
+        owner: "{{usuario}}"
+        group: "{{usuario}}"
+        state: directory
+   
+
+- name: Inicializar la base de datos de PostgreSQL  en el directorio creado anteriormente
+  become: true
+  become_user: "{{usuario}}"
+  command: /usr/lib/postgresql/13/bin/initdb -D {{directorio}}
+
+- name: Habilitar PostgreSQL en el arranque del sistema
+  service:
+        name: "{{servicio}}"
+        enabled: true
+        state: started
+
+- name: Copiar script para crear usuario y BBDD
+  ansible.builtin.copy:
+        src: "{{fichero}}"
+        dest: /tmp/{{fichero}}
+        owner: "{{usuario}}"
+        group: "{{usuario}}"
+        mode: '0744'
+
+- name: Lanzar script para Crear un usuario y una base de datos
+  become: true
+  become_user: "{{usuario}}"
+  ansible.builtin.shell:
+        cmd: /tmp/{{fichero}}
+  notify: reiniciar  

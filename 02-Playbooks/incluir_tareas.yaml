@@ -1,0 +1,34 @@
+---
+- name: Primer play del curso
+  hosts: servidores_de_aplicaciones
+  
+  tasks:
+  - name: Realizar un ping
+    ansible.builtin.ping:
+  - name: Crear un fichero
+    ansible.builtin.shell:
+      touch /tmp/fichero1.txt
+
+- name: segundo play del curso
+  hosts: debian
+
+  tasks:
+  - name: Parar apache2
+    include_tasks: parar_apache2.yaml
+
+  - name: Instalar nginx
+    ansible.builtin.apt:
+      name: nginx
+      state: present
+      update_cache: true
+  - name: Arrancar nginx
+    ansible.builtin.service:
+      name: nginx
+      state: started
+  - name: Copiar index.html a los servidores debian
+    ansible.builtin.copy:
+      src: /home/ansible/ansibleUdemy/practicas/02-Playbooks/recursos/index.html
+      dest: /var/www/html
+      owner: root
+      group: root
+      mode: '0644'

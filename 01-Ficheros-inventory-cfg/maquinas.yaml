@@ -1,0 +1,19 @@
+all:
+  hosts:
+    ubuntu1:
+  children:
+    debian:
+      hosts:
+        debian1:
+        debian2:
+    rocky:
+      hosts:
+        rocky1:
+        rocky2:
+    servidores_de_datos:
+      hosts:
+        mysql1:
+    servidores_de_aplicaciones:
+      hosts:
+        tomcat1:
+        tomcat2:

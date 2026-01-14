@@ -1,0 +1,39 @@
+---
+- name: Trabajar con usuarios
+  hosts: debian
+      
+  tasks:
+  - name: Crear un usuario simple
+    user:
+      name: USERJUPA
+
+  - name: Crear un grupo
+    group:
+      name: GROUPVZP
+      state: present
+
+  - name: Crear usuario PABO asignado al grupo GROUPVZP
+    user:
+      name: PABO
+      group: GROUPVZP
+      shell: /bin/bash
+      home: /home/PABO  # Consistente con el nombre de usuario
+      create_home: yes
+      password: "{{ 'password' | password_hash('sha512', 'mysalt') }}"
+      state: present
+
+  # Opcional: Agregar clave SSH para acceso sin contraseña
+  - name: Agregar clave SSH pública al usuario
+    authorized_key:
+      user: PABO
+      key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      state: present
+    when: ansible_ssh_public_key is defined
+
+  # Opcional: Agregar usuario a sudo si es necesario
+  - name: Agregar usuario al grupo sudo (opcional)
+    user:
+      name: PABO
+      groups: sudo
+      append: yes
+    when: add_to_sudo | default(false)

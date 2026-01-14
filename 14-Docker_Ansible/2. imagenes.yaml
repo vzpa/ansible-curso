@@ -1,0 +1,10 @@
+---
+- name: Descargar imagen Docker
+  hosts: localhost
+  
+
+  tasks:
+  - name: Descargar Tomcat 
+    community.docker.docker_image:
+      name: tomcat
+      source: pull

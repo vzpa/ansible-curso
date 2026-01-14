@@ -1,0 +1,16 @@
+---
+- name: Trabajar con variables
+  hosts: localhost
+  
+
+  tasks:
+  - name: Crear un contenedor Mariadb
+    community.docker.docker_container:
+      name: mariadb1
+      image: mariadb
+      detach: true
+      env:
+        MARIADB_ROOT_PASSWORD: "lepanto"
+        MARIADB_DATABASE: "db1"
+        MARIADB_USER: "usu1"
+        MARIADB_PASSWORD: "lepanto"

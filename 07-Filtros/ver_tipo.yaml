@@ -1,0 +1,32 @@
+###   FILTROS  ####
+## 
+## Permiten realizar distintas operaciones como pueden ser
+##      - conversion
+##      - transformacion
+##      - extracciones
+##      - manipular datos
+##      - etc...
+##
+##  NOTA: los filtrpos se ejecutan en el Controller no en la máquina remota
+## Se usa el símbolo | (pipe-tuberia) para indicarlos
+
+---
+- name: Ejemplos varios de filtros
+  hosts: debian1
+  vars:
+       cadena: "hola"
+       numero: 10
+       verdad: true
+       lista:
+          - pepe
+          - juan
+          - antonio
+       lista1: ['pepe','juan','antonio']  
+       diccion                                                                                                ario:
+           nombre: juan
+           edad: 27  
+ 
+  tasks:
+  - name: Averiguar el tipo de una variable
+    ansible.builtin.debug:
+      var: diccionario | type_debug

@@ -1,0 +1,16 @@
+{# 
+FILTROS. SIMILARES A LOS DE ANSIBLE
+#}
+
+<h1> LISTA DE PRODUCTOS </h1>
+<h2> Estos son los productos de la tienda </h2>
+<ol>
+ {%for producto in productos %}
+    <li> {{producto | upper  }} </li>
+  {% endfor %}
+
+  <li> {{ productos | join(' ') | upper }} </li>
+  <li> {{ productos | sort | join(' - ') }} </li>           
+  <li> {{ 4.35 * 10 | abs }} </li>
+
+</ol>

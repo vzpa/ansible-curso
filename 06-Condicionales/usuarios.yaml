@@ -1,6 +1,6 @@
 ---
 - name: Crear usuarios con bucles
-  hosts: debian1
+  hosts: awx
   vars_files: /home/ansible/ansibleUdemy/practicas/06-Condicionales/recursos/list_usuario.yaml
   tasks:
 

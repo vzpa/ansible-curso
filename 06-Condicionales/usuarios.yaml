@@ -11,11 +11,12 @@
      uid: "{{item.uid}}"
      group: "{{item.grupo}}"
      shell: "{{item.shell}}"
-     state: absent
+     state: present
+     create_home: yes
     loop: "{{usuarios}}"  
   
   - name: Crear grupos necesarios
     ansible.builtin.group:
      name: "{{item.grupo}}"
-     state: absent
+     state: present
     loop: "{{usuarios}}"

@@ -1,0 +1,44 @@
+---
+- name: Chequeo básico de localhost RHEL8
+  hosts: localhost
+  gather_facts: yes
+  become: true
+
+  vars:
+    servicios_importantes:
+      - sshd
+      - firewalld
+      - chronyd
+
+  tasks:
+    - name: Verificar conectividad a localhost
+      ansible.builtin.ping:
+
+    - name: Mostrar algunos facts del sistema
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ ansible_hostname }}"
+          - "SO: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Kernel: {{ ansible_kernel }}"
+
+    - name: Comprobar uso de disco en /
+      ansible.builtin.command: df -h /
+      register: uso_disco
+
+    - name: Mostrar uso de disco en /
+      ansible.builtin.debug:
+        var: uso_disco.stdout_lines
+
+    - name: Verificar estado de servicios importantes
+      ansible.builtin.service_facts:
+
+    - name: Mostrar estado de servicios definidos
+      ansible.builtin.debug:
+        msg: >-
+          Servicio {{ item }}:
+          {{
+            (ansible_facts.services[item + '.service'].state
+             if (item + '.service') in ansible_facts.services
+             else 'no encontrado')
+          }}
+      loop: "{{ servicios_importantes }}"

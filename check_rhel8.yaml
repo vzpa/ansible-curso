@@ -31,6 +31,7 @@
 
     - name: Verificar estado de servicios importantes
       ansible.builtin.service_facts:
+         var: ansible_facts.services
     - name: Verificar estado de servicios importantes
       ansible.builtin.debug:
         msg: >-

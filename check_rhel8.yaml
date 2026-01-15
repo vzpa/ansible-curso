@@ -36,12 +36,12 @@
         msg: >-
            Servicio {{ item }}:
            {{
-           'state=' ~ ansible_facts.services[item + '.service'].state ~
-           ', status=' ~ ansible_facts.services[item + '.service'].status
-           if (ansible_facts.services is defined and
-             (item + '.service') in ansible_facts.services)
-           else 'no existe o no está registrado en systemd'
-         }}
-     loop: "{{ servicios_importantes }}"
+             'state=' ~ ansible_facts.services[item + '.service'].state ~
+              ', status=' ~ ansible_facts.services[item + '.service'].status
+              if (ansible_facts.services is defined and
+                 (item + '.service') in ansible_facts.services)
+              else 'no existe o no está registrado en systemd'
+            }}
+      loop: "{{ servicios_importantes }}"
 
 ...

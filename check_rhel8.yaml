@@ -6,9 +6,9 @@
 
   vars:
     servicios_importantes:
-      - sshd
-      - firewalld
-      - chronyd
+      - sshd.servcie
+      - firewalld.service
+      - chronyd.service
 
   tasks:
     - name: Verificar conectividad a localhost

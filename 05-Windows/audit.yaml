@@ -1,0 +1,23 @@
+- name: Auditoría de archivos en C:\
+  hosts: windows
+  gather_facts: no
+  tasks:
+
+    - name: Buscar todos los archivos en C:\
+      ansible.windows.win_find:
+        paths: C:\
+        recurse: yes
+      register: archivos
+
+    - name: Obtener información de cada archivo
+      ansible.windows.win_stat:
+        path: "{{ item.path }}"
+        get_size: true
+        get_checksum: false   # pon true si quieres calcular hash
+      loop: "{{ archivos.files }}"
+      register: info_archivos
+
+    - name: Mostrar archivos grandes (>1GB)
+      debug:
+        msg: "{{ item.stat.path }} - {{ item.stat.size | human_readable }}"
+      loop: "{{ info_archivos.results | selectattr('stat.size','defined') | selectattr('stat.size','gt',1073741824) | list }}"

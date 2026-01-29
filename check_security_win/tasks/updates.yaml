@@ -1,23 +1,16 @@
-- name: Detectar actualizaciones faltantes (PowerShell) - Versión corregida
+- name: Detectar actualizaciones faltantes (PowerShell) - Sin comentario problemático
   ansible.windows.win_shell: |
     $session = New-Object -ComObject Microsoft.Update.Session
     $searcher = $session.CreateUpdateSearcher()
-    
-    # Criterio con comillas dobles escapadas (backtick ` para escapar " en PowerShell)
     $criteria = "IsInstalled=0 and Type='Software' and IsHidden=0"
-    
     $updates = $searcher.Search($criteria)
-    
     $critical = $updates.Updates | Where-Object { $_.MsrcSeverity -eq 'Critical' }
-    
     $output = @{
       total_missing    = $updates.Updates.Count
       critical_missing = $critical.Count
     }
-    
     ConvertTo-Json $output -Compress
   args:
     executable: powershell.exe
   register: missing_updates
   changed_when: false
-  failed_when: missing_updates.rc != 0 and 'Access is denied' not in missing_updates.stderr  # Opcional: ignora ciertos errores comunes

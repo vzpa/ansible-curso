@@ -1,24 +1,35 @@
 ---
-# Auditoría contra Microsoft Security Baseline
+# tasks/security_baseline.yaml (versión corregida y robusta)
 
-- name: Auditar Credential Guard
+- name: Auditar Credential Guard (VBS / Credential Guard)
   ansible.windows.win_reg_stat:
     path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System
     name: EnableVirtualizationBasedSecurity
-  register: cred_guard
-  # Comentario: Debe ser 1 para mitigar credential theft (Baseline: Device Guard)
+  register: cred_guard_result
+  ignore_errors: true   # ← importante: evita que falle todo el playbook si la clave no existe
 
-- name: Auditar Exploit Protection
-  ansible.windows.win_shell: Get-ProcessMitigation -System | ConvertTo-Json
+- name: Auditar Exploit Protection (configuración de sistema)
+  ansible.windows.win_shell: |
+    Get-ProcessMitigation -System | ConvertTo-Json -Compress
   args:
     executable: powershell.exe
   register: exploit_protection
   changed_when: false
-  # Comentario: Verifica mitigations como DEP, ASLR (Baseline: Exploit Guard)
+  ignore_errors: true
 
-- name: Registrar resultados baseline
-  set_fact:
-    audit_results: "{{ audit_results | combine({ 'security_baseline': {
-      'cred_guard_enabled': cred_guard.value == 1,
-      'exploit_protection': exploit_protection.stdout | from_json | default({})} }) }}"
-  # Comentario: Severidad crítica si no habilitado, expone a memory corruption zero-days.
+- name: Registrar resultados de Microsoft Security Baseline
+  ansible.builtin.set_fact:
+    audit_results: "{{ audit_results | default({}) | combine({
+      'security_baseline': {
+        'cred_guard': {
+          'exists': cred_guard_result.exists | default(false),
+          'enabled': (cred_guard_result.value | default(0)) == 1,
+          'value_raw': cred_guard_result.value | default('Not set'),
+          'compliant': (cred_guard_result.exists | default(false)) and (cred_guard_result.value | default(0)) == 1
+        },
+        'exploit_protection': {
+          'raw_output': exploit_protection.stdout | default('Error querying'),
+          'success': exploit_protection.rc | default(1) == 0
+        }
+      }}) }}"
+  # Nota: usamos | default() en todas partes para evitar "undefined variable"

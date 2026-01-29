@@ -1,7 +1,29 @@
-- name: Registrar resultados Firewall
+- name: Registrar resultados Firewall (versión ultra-segura)
   ansible.builtin.set_fact:
     audit_results: "{{ audit_results | default({}) | combine({
       'firewall': {
-        'profiles_enabled': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3,
-        'logging_enabled': (fw_logging.stdout | from_json | default({})).LogBlocked == true
+        'profiles': {
+          'raw_output': fw_profiles.stdout | default('No data or task failed'),
+          'parsed_data': fw_profiles.stdout | from_json | default([]) if fw_profiles.stdout is string else [],
+          'enabled_count': (fw_profiles.stdout | from_json | default([]) if fw_profiles.stdout is string else []) | selectattr('Enabled', 'equalto', true) | list | length,
+          'all_enabled': ((fw_profiles.stdout | from_json | default([]) if fw_profiles.stdout is string else []) | selectattr('Enabled', 'equalto', true) | list | length) == 3,
+          'compliant': ((fw_profiles.stdout | from_json | default([]) if fw_profiles.stdout is string else []) | selectattr('Enabled', 'equalto', true) | list | length) == 3
+        },
+        'logging': {
+          'raw_output': fw_logging.stdout | default('No data or task failed'),
+          'parsed_data': fw_logging.stdout | from_json | default({}) if fw_logging.stdout is string else {},
+          'log_blocked': (fw_logging.stdout | from_json | default({}) if fw_logging.stdout is string else {}).LogBlocked | default(false),
+          'compliant': (fw_logging.stdout | from_json | default({}) if fw_logging.stdout is string else {}).LogBlocked | default(false) == true
+        },
+        'assessment': {
+          'status': 'Cumple' if 
+            ((fw_profiles.stdout | from_json | default([]) if fw_profiles.stdout is string else []) | selectattr('Enabled', 'equalto', true) | list | length) == 3 
+            and (fw_logging.stdout | from_json | default({}) if fw_logging.stdout is string else {}).LogBlocked | default(false) 
+          else 'No cumple (perfiles o logging fallaron)',
+          'severity': 'high' if 
+            not (((fw_profiles.stdout | from_json | default([]) if fw_profiles.stdout is string else []) | selectattr('Enabled', 'equalto', true) | list | length) == 3 
+                 and (fw_logging.stdout | from_json | default({}) if fw_logging.stdout is string else {}).LogBlocked | default(false)) 
+          else 'low',
+          'notes': 'Verificar si las tareas previas de firewall fallaron (rc != 0)'
+        }
       }}) }}"

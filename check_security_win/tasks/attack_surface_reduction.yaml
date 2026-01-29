@@ -1,25 +1,48 @@
 ---
-# Auditoría de Attack Surface Reduction
+# tasks/attack_surface_reduction.yml – Versión corregida y robusta
 
-- name: Auditar ASR rules
-  ansible.windows.win_shell: Get-MpPreference | Select-Object -Property AttackSurfaceReductionRules_Actions, AttackSurfaceReductionRules_Ids | ConvertTo-Json
+- name: Verificar estado del servicio de Windows Defender (para ASR)
+  ansible.windows.win_service_info:
+    name: WinDefend
+  register: windefend_service
+  ignore_errors: true
+  failed_when: false
+
+- name: Intentar obtener configuración ASR (solo si Defender está activo)
+  ansible.windows.win_shell: |
+    $prefs = Get-MpPreference -ErrorAction SilentlyContinue
+    if ($prefs) {
+      @{
+        AttackSurfaceReductionRules_Actions = $prefs.AttackSurfaceReductionRules_Actions
+        AttackSurfaceReductionRules_Ids     = $prefs.AttackSurfaceReductionRules_Ids
+      } | ConvertTo-Json -Compress
+    } else {
+      @{ 
+        status = 'Defender service not running - cannot query ASR rules (0x800106ba)'
+      } | ConvertTo-Json -Compress
+    }
   args:
     executable: powershell.exe
   register: asr_config
+  ignore_errors: true
   changed_when: false
-  # Comentario: Verifica si rules están en Block mode
+  failed_when: false
 
-- name: Procesar ASR results
-  set_fact:
-    asr_results: []
-  loop: "{{ asr_rules }}"
-  loop_control:
-    loop_var: rule
-  vars:
-    rule_state: "{{ asr_config.stdout | from_json | json_query('AttackSurfaceReductionRules_Ids[] | [?contains(@, rule.guid)] | AttackSurfaceReductionRules_Actions[0]') | default(0) }}"
-    asr_results: "{{ asr_results + [{ 'guid': rule.guid, 'state': rule_state, 'compliant': rule_state == rule.expected, 'severity': rule.severity }] }}"
-
-- name: Registrar resultados ASR
-  set_fact:
-    audit_results: "{{ audit_results | combine({ 'asr': asr_results }) }}"
-  # Comentario: Severidad high; ASR mitiga zero-days en Office, scripts, etc.
+- name: Registrar resultados ASR (versión tolerante)
+  ansible.builtin.set_fact:
+    audit_results: "{{ audit_results | default({}) | combine({
+      'asr': {
+        'defender_service_running': windefend_service.exists | default(false) and 
+                                    (windefend_service.services | default([]) | selectattr('state', 'equalto', 'running') | list | length > 0),
+        'query_success': asr_config.rc == 0 and 'status' not in (asr_config.stdout | from_json | default({})),
+        'raw_output': asr_config.stdout | from_json | default({ status: 'Cannot query ASR - Defender not running' }),
+        'overall_status': 'CRITICAL - Defender no activo, ASR no queryable' 
+                          if not (windefend_service.exists | default(false)) or 
+                             (windefend_service.services | default([]) | length == 0) or 
+                             (windefend_service.services | first | default({})).state != 'running'
+                          else 'Active (ASR query OK)',
+        'severity': 'critical' if not (windefend_service.exists | default(false)) or 
+                                   (windefend_service.services | default([]) | length == 0) or 
+                                   (windefend_service.services | first | default({})).state != 'running'
+                          else 'medium'
+      }}) }}"

@@ -1,20 +1,7 @@
-- name: Registrar resultados Firewall (versión segura)
+- name: Registrar resultados Firewall
   ansible.builtin.set_fact:
     audit_results: "{{ audit_results | default({}) | combine({
       'firewall': {
-        'profiles': {
-          'raw_data': fw_profiles.stdout | from_json | default([]),
-          'enabled_count': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length),
-          'all_enabled': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3,
-          'compliant': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3
-        },
-        'logging': {
-          'raw_data': fw_logging.stdout | from_json | default({}),
-          'log_blocked': (fw_logging.stdout | from_json | default({})).LogBlocked | default(false),
-          'compliant': (fw_logging.stdout | from_json | default({})).LogBlocked | default(false) == true
-        },
-        'overall_assessment': {
-          'status': 'Cumple' if (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3 and (fw_logging.stdout | from_json | default({})).LogBlocked | default(false) else 'No cumple',
-          'severity': 'high' if not ((fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3 and (fw_logging.stdout | from_json | default({})).LogBlocked | default(false)) else 'low'
-        }
+        'profiles_enabled': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3,
+        'logging_enabled': (fw_logging.stdout | from_json | default({})).LogBlocked == true
       }}) }}"

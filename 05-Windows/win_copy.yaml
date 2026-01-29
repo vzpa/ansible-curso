@@ -1,5 +1,5 @@
 - name: Modulos de Ansible para Windows
-  hosts: maquinas
+  hosts: windows
 
 
   tasks:

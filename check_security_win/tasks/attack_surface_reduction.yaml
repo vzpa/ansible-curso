@@ -1,19 +1,19 @@
-- name: Registrar resultados ASR (versión ultra-tolerante)
+- name: Registrar resultados ASR (versión corregida sin filtro get)
   ansible.builtin.set_fact:
     audit_results: "{{ audit_results | default({}) | combine({
       'asr': {
         'defender_service': {
           'exists': windefend_service.exists | default(false),
-          'running': windefend_service.services | default([]) | selectattr('state', 'equalto', 'running') | list | length > 0 if windefend_service.services is defined else false,
-          'state': windefend_service.services | default([]) | first | default({}) | get('state', 'not_found'),
-          'start_mode': windefend_service.services | default([]) | first | default({}) | get('start_mode', 'unknown')
+          'running': (windefend_service.services | default([]) | selectattr('state', 'equalto', 'running') | list | length > 0) if windefend_service.services is defined else false,
+          'state': (windefend_service.services | default([]) | first | default({})).state | default('not_found'),
+          'start_mode': (windefend_service.services | default([]) | first | default({})).start_mode | default('unknown')
         },
         'asr_query': {
           'success': asr_config.rc | default(1) == 0,
           'raw_stdout': asr_config.stdout | default('No output - task failed'),
           'parsed': asr_config.stdout | from_json | default({}) if asr_config.stdout is string else {},
-          'status_message': (asr_config.stdout | from_json | default({}) if asr_config.stdout is string else {}).get('status', 'Defender not running - ASR not queryable (0x800106ba)'),
-          'has_rules': (asr_config.stdout | from_json | default({}) if asr_config.stdout is string else {}).get('AttackSurfaceReductionRules_Ids', []) | length > 0
+          'status_message': (asr_config.stdout | from_json | default({}) if asr_config.stdout is string else {}).status | default('Defender not running - ASR not queryable (0x800106ba)'),
+          'has_rules': ((asr_config.stdout | from_json | default({}) if asr_config.stdout is string else {}).AttackSurfaceReductionRules_Ids | default([]) | length > 0)
         },
         'assessment': {
           'status': 'CRITICAL - Defender service no activo → ASR no disponible',

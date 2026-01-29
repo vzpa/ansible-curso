@@ -1,50 +1,19 @@
----
-# tasks/defender.yml (versión corregida y segura)
-
-- name: Verificar estado general del servicio de Windows Defender
-  ansible.windows.win_service_info:
-    name: WinDefend
-  register: windefend_service
-  ignore_errors: true   # Evita fallo total si módulo falla por cualquier razón
-
 - name: Intentar obtener configuración de Defender (solo si servicio está corriendo)
   ansible.windows.win_shell: |
     $prefs = Get-MpPreference -ErrorAction SilentlyContinue
     if ($prefs) {
-      @{ 
-        DisableRealtimeMonitoring = $prefs.DisableRealtimeMonitoring;
-        MAPSReporting = $prefs.MAPSReporting;
-        SubmitSamplesConsent = $prefs.SubmitSamplesConsent 
+      @{
+        DisableRealtimeMonitoring = $prefs.DisableRealtimeMonitoring
+        MAPSReporting             = $prefs.MAPSReporting
+        SubmitSamplesConsent      = $prefs.SubmitSamplesConsent
       } | ConvertTo-Json -Compress
     } else {
-      @{ error = "Cannot query MpPreference - likely service not running" } | ConvertTo-Json -Compress
+      @{
+        'error' = 'Cannot query MpPreference - likely service not running (0x800106ba)'
+      } | ConvertTo-Json -Compress
     }
   args:
     executable: powershell.exe
   register: defender_prefs
   ignore_errors: true
   changed_when: false
-
-- name: Registrar estado de Microsoft Defender (versión robusta y segura)
-  ansible.builtin.set_fact:
-    audit_results: "{{ audit_results | default({}) | combine({
-      'defender': {
-        'service': {
-          'exists': windefend_service.exists | default(false),
-          'found_count': windefend_service.services | default([]) | length,
-          'running': (windefend_service.services | default([]) | selectattr('state', 'equalto', 'running') | list | length > 0) if windefend_service.exists | default(false) else false,
-          'state': (windefend_service.services | default([]) | first | default({})).state | default('not_found'),
-          'start_mode': (windefend_service.services | default([]) | first | default({})).start_mode | default('unknown')
-        },
-        'preferences': {
-          'queried_successfully': defender_prefs.rc == 0 and 'error' not in (defender_prefs.stdout | from_json | default({})),
-          'realtime_disabled': (defender_prefs.stdout | from_json).DisableRealtimeMonitoring | default(true) if defender_prefs.rc == 0 else true,
-          'cloud_reporting': (defender_prefs.stdout | from_json).MAPSReporting | default(0) if defender_prefs.rc == 0 else 0,
-          'sample_submission': (defender_prefs.stdout | from_json).SubmitSamplesConsent | default(0) if defender_prefs.rc == 0 else 0,
-          'query_error': (defender_prefs.stdout | from_json).error | default('0x800106ba - Defender service not running')
-        },
-        'overall_assessment': {
-          'status': 'CRITICAL - Defender service NOT running or not queryable' if not (windefend_service.exists | default(false)) or (windefend_service.services | default([]) | length == 0) or (windefend_service.services | first | default({})).state != 'running' else 'Active',
-          'severity': 'critical' if not (windefend_service.exists | default(false)) or (windefend_service.services | default([]) | length == 0) or (windefend_service.services | first | default({})).state != 'running' else 'medium'
-        }
-      }}) }}"

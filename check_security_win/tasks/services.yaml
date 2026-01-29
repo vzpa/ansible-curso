@@ -1,0 +1,22 @@
+---
+# Auditoría de servicios inseguros
+
+- name: Obtener info de servicios
+  ansible.windows.win_service_info:
+  register: all_services
+  # Comentario: Recopila todos los servicios
+
+- name: Auditar servicios específicos
+  set_fact:
+    service_results: []
+  loop: "{{ insecure_services }}"
+  loop_control:
+    loop_var: svc
+  vars:
+    svc_state: "{{ all_services.services | selectattr('name', 'equalto', svc.name) | map(attribute='state') | first | default('unknown') }}"
+    service_results: "{{ service_results + [{ 'name': svc.name, 'state': svc_state, 'compliant': svc_state == svc.expected_state, 'severity': svc.severity }] }}"
+
+- name: Registrar resultados servicios
+  set_fact:
+    audit_results: "{{ audit_results | combine({ 'services': service_results }) }}"
+  # Comentario: Severidad basada en lista; e.g., SMB running es high para EternalBlue-like.

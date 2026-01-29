@@ -1,0 +1,61 @@
+---
+# Variables principales para auditoría
+
+# Lista de servicios inseguros o innecesarios en standalone (basado en CIS y Microsoft Baseline)
+insecure_services:
+  - name: "LanmanServer"  # SMB Server, expone a zero-days como EternalBlue
+    expected_state: "stopped"
+    severity: "high"
+  - name: "WinRM"  # Si no se usa, debería estar disabled para reducir superficie
+    expected_state: "stopped"
+    severity: "medium"
+  - name: "RemoteRegistry"  # Acceso remoto a registry, riesgo de post-exploitation
+    expected_state: "stopped"
+    severity: "high"
+  - name: "XblAuthManager"  # Xbox Live, innecesario en standalone
+    expected_state: "stopped"
+    severity: "low"
+
+# Registry keys críticas para hardening (basado en Microsoft Baseline y CIS)
+critical_registry_keys:
+  - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+    name: "RunAsPPL"
+    expected_value: 1  # LSASS como Protected Process Light
+    severity: "critical"
+    description: "Protección de LSASS contra credential dumping"
+  - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+    name: "EnableVirtualizationBasedSecurity"
+    expected_value: 1  # Credential Guard
+    severity: "high"
+    description: "Habilitar Credential Guard"
+  - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Netlogon\\Parameters"
+    name: "RequireSignOrSeal"
+    expected_value: 1  # SMB signing
+    severity: "critical"
+    description: "Firma SMB para mitigar relay attacks"
+  - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\ExploitGuard\\ExploitProtection"
+    name: "ExploitProtectionSettings"
+    expected_value: "Enabled"  # Exploit Protection (simplificado; en realidad es un XML, pero chequeamos existencia)
+    severity: "high"
+    description: "Mitigaciones de memoria contra zero-days"
+
+# Políticas de contraseña CIS (audit via registry o PowerShell)
+password_policies:
+  - name: "MinimumPasswordLength"
+    expected: 14
+    severity: "medium"
+  - name: "PasswordComplexity"
+    expected: 1
+    severity: "medium"
+  - name: "LockoutThreshold"
+    expected: 5
+    severity: "high"
+
+# ASR rules (Attack Surface Reduction) - IDs estándar de Microsoft
+asr_rules:
+  - guid: "d4f940ab-401b-4efc-aadc-ad5f3c50688a"  # Block Office apps creating child processes
+    expected: 1  # 1=Block, 2=Audit
+    severity: "high"
+
+# Diccionario para recolectar resultados (inicializado vacío)
+audit_results: {}

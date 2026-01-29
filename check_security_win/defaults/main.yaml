@@ -1,0 +1,18 @@
+---
+# Defaults para el rol de auditoría de seguridad en Windows
+
+# Path donde se generará el reporte HTML en el controlador (Ansible host)
+report_path: "/tmp/audit_reports"
+
+# Nombre base del reporte (se appending hostname)
+report_filename: "windows_audit_report_{{ inventory_hostname }}.html"
+
+# Severidades por defecto para clasificación
+severity_levels:
+  critical: "Crítico"
+  high: "Alto"
+  medium: "Medio"
+  low: "Bajo"
+
+# Habilitar verbose logging en auditoría (para debugging)
+verbose_audit: false

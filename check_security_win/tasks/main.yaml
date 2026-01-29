@@ -1,0 +1,25 @@
+---
+# Tasks principales - Importa módulos de auditoría
+
+- name: Inicializar resultados de auditoría
+  set_fact:
+    audit_results: "{{ audit_results | default({}) }}"
+
+- import_tasks: updates.yaml
+- import_tasks: security_baseline.yaml
+- import_tasks: cis_controls.yaml
+- import_tasks: defender.yaml
+- import_tasks: firewall.yaml
+- import_tasks: services.yaml
+- import_tasks: registry.yaml
+- import_tasks: logging.yaml
+- import_tasks: attack_surface_reduction.yaml
+- import_tasks: zero_day_mitigations.yaml
+
+- name: Generar reporte HTML
+  template:
+    src: reporte.html.j2
+    dest: "{{ report_path }}/{{ report_filename }}"
+  delegate_to: localhost
+  run_once: true
+  notify: reporte_generado

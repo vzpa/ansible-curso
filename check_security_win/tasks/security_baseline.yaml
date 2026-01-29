@@ -1,0 +1,24 @@
+---
+# Auditoría contra Microsoft Security Baseline
+
+- name: Auditar Credential Guard
+  ansible.windows.win_reg_stat:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System
+    name: EnableVirtualizationBasedSecurity
+  register: cred_guard
+  # Comentario: Debe ser 1 para mitigar credential theft (Baseline: Device Guard)
+
+- name: Auditar Exploit Protection
+  ansible.windows.win_shell: Get-ProcessMitigation -System | ConvertTo-Json
+  args:
+    executable: powershell.exe
+  register: exploit_protection
+  changed_when: false
+  # Comentario: Verifica mitigations como DEP, ASLR (Baseline: Exploit Guard)
+
+- name: Registrar resultados baseline
+  set_fact:
+    audit_results: "{{ audit_results | combine({ 'security_baseline': {
+      'cred_guard_enabled': cred_guard.value == 1,
+      'exploit_protection': exploit_protection.stdout | from_json | default({})} }) }}"
+  # Comentario: Severidad crítica si no habilitado, expone a memory corruption zero-days.

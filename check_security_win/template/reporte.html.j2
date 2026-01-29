@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reporte de Auditoría de Seguridad - {{ inventory_hostname }}</title>
+    <style>
+        body { font-family: Arial; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background-color: #f2f2f2; }
+        .critical { background-color: #ffcccc; }
+        .high { background-color: #ffe5cc; }
+        .medium { background-color: #ffffcc; }
+        .low { background-color: #ccffcc; }
+        .cumple { color: green; }
+        .no_cumple { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Reporte de Auditoría de Seguridad para {{ inventory_hostname }}</h1>
+    <p>Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}</p>
+    
+    {% for section, data in audit_results.items() %}
+    <h2>{{ section | capitalize }}</h2>
+    <table>
+        <tr><th>Control</th><th>Estado</th><th>Severidad</th><th>Evidencia</th></tr>
+        {% if data is mapping %}
+            {% for key, value in data.items() %}
+            <tr>
+                <td>{{ key }}</td>
+                <td class="{% if value.compliant is defined %}{% if value.compliant %}cumple{% else %}no_cumple{% endif %}{% elif value %}cumple{% else %}no_cumple{% endif %}">
+                    {% if value.compliant is defined %}{{ 'Cumple' if value.compliant else 'No cumple' }}{% else %}{{ 'Cumple' if value else 'No cumple' }}{% endif %}
+                </td>
+                <td class="{% if value.severity is defined %}{{ value.severity }}{% else %}medium{% endif %}">
+                    {{ value.severity | default('Medio') }}
+                </td>
+                <td>{{ value | to_nice_yaml }}</td>
+            </tr>
+            {% endfor %}
+        {% elif data is sequence %}
+            {% for item in data %}
+            <tr>
+                <td>{{ item.name | default(item.guid) | default(item.path) }}</td>
+                <td class="{% if item.compliant %}cumple{% else %}no_cumple{% endif %}">{{ 'Cumple' if item.compliant else 'No cumple' }}</td>
+                <td class="{{ item.severity }}">{{ item.severity | capitalize }}</td>
+                <td>{{ item | to_nice_yaml }}</td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr><td colspan="4">{{ data | to_nice_yaml }}</td></tr>
+        {% endif %}
+    </table>
+    {% endfor %}
+</body>
+</html>

@@ -1,0 +1,28 @@
+---
+# Auditoría de mitizaciones zero-day
+
+- name: Auditar superficie de ataque (e.g., RDP, SMB)
+  ansible.windows.win_shell: |
+    $rdp = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections"
+    $smb = Get-SmbServerConfiguration | Select-Object EnableSMB1Protocol, RequireSecuritySignature
+    @{ rdp_enabled: $rdp.fDenyTSConnections -eq 0; smb1_enabled: $smb.EnableSMB1Protocol; smb_signing: $smb.RequireSecuritySignature } | ConvertTo-Json
+  args:
+    executable: powershell.exe
+  register: attack_surface
+  changed_when: false
+  # Comentario: RDP disabled por defecto, SMB1 off, signing on
+
+- name: Auditar WMI y PowerShell constraints
+  ansible.windows.win_shell: Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" | ConvertTo-Json
+  args:
+    executable: powershell.exe
+  register: lua_status
+  changed_when: false
+  # Comentario: UAC/LUA para mitigar elevation (contra zero-days)
+
+- name: Registrar resultados zero-day
+  set_fact:
+    audit_results: "{{ audit_results | combine({ 'zero_day': {
+      'attack_surface': attack_surface.stdout | from_json | default({}),
+      'lua_enabled': (lua_status.stdout | from_json).EnableLUA == 1} }) }}"
+  # Comentario: Severidad crítica para SMB1 enabled (exposición a worms), high para RDP.

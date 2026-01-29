@@ -1,0 +1,23 @@
+---
+# Auditoría de registry
+
+- name: Auditar keys de registry
+  ansible.windows.win_reg_stat:
+    path: "{{ item.path }}"
+    name: "{{ item.name }}"
+  register: reg_results
+  loop: "{{ critical_registry_keys }}"
+  # Comentario: Solo stat, no edit
+
+- name: Procesar resultados registry
+  set_fact:
+    registry_results: []
+  loop: "{{ reg_results.results }}"
+  loop_control:
+    loop_var: reg
+    registry_results: "{{ registry_results + [{ 'path': reg.path, 'name': reg.name, 'value': reg.value, 'compliant': reg.value == critical_registry_keys[loop_index].expected_value, 'severity': critical_registry_keys[loop_index].severity, 'description': critical_registry_keys[loop_index].description }] }}"
+
+- name: Registrar resultados registry
+  set_fact:
+    audit_results: "{{ audit_results | combine({ 'registry': registry_results }) }}"
+  # Comentario: Enfocado en keys que mitigan zero-days como credential dumping.

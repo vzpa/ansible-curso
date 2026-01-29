@@ -1,0 +1,25 @@
+---
+# Auditoría de logging
+
+- name: Auditar políticas de auditoría (PowerShell)
+  ansible.windows.win_shell: AuditPol /get /category:* | ConvertTo-Json
+  args:
+    executable: powershell.exe
+  register: audit_policies
+  changed_when: false
+  # Comentario: Verifica categories como Logon/Logoff (CIS 17.5.1)
+
+- name: Auditar tamaño de event logs
+  ansible.windows.win_shell: Get-EventLog -List | Select-Object -Property Log, MaximumKilobytes | ConvertTo-Json
+  args:
+    executable: powershell.exe
+  register: event_logs
+  changed_when: false
+  # Comentario: Debe ser al menos 32768 KB (CIS 17.9.1)
+
+- name: Registrar resultados logging
+  set_fact:
+    audit_results: "{{ audit_results | combine({ 'logging': {
+      'audit_policies': audit_policies.stdout | from_json | default({}),
+      'event_log_sizes': event_logs.stdout | from_json | default([])} }) }}"
+  # Comentario: Severidad media; logging débil facilita evasion post-exploitation.

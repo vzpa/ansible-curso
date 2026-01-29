@@ -1,0 +1,27 @@
+---
+# Auditoría contra CIS Microsoft Windows 11 Stand-alone Benchmark
+
+- name: Auditar políticas de contraseña (PowerShell)
+  ansible.windows.win_shell: |
+    secedit /export /cfg $env:TEMP\secpol.cfg
+    Get-Content $env:TEMP\secpol.cfg | Select-String -Pattern 'MinimumPasswordLength|PasswordComplexity|LockoutThreshold'
+  args:
+    executable: powershell.exe
+  register: pass_policies
+  changed_when: false
+  # Comentario: Extrae de secpol (CIS 1.1.1 - 1.1.5)
+
+- name: Auditar cuentas locales innecesarias
+  ansible.windows.win_shell: Get-LocalUser | Where-Object { $_.Enabled -eq $true -and $_.Name -ne 'Administrator' } | ConvertTo-Json
+  args:
+    executable: powershell.exe
+  register: local_users
+  changed_when: false
+  # Comentario: En standalone, minimizar cuentas (CIS 2.3.1)
+
+- name: Registrar resultados CIS
+  set_fact:
+    audit_results: "{{ audit_results | combine({ 'cis_controls': {
+      'password_policies': pass_policies.stdout_lines,
+      'extra_local_users': local_users.stdout | from_json | default([]) | length > 0} }) }}"
+  # Comentario: Severidad media para políticas débiles, alto para cuentas extras.

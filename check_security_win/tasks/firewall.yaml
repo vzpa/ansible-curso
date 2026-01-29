@@ -1,25 +1,20 @@
----
-# Auditoría de Windows Firewall
-
-- name: Auditar perfiles de Firewall
-  ansible.windows.win_shell: Get-NetFirewallProfile | Select-Object -Property Name, Enabled | ConvertTo-Json
-  args:
-    executable: powershell.exe
-  register: fw_profiles
-  changed_when: false
-  # Comentario: Todos los perfiles deben estar Enabled (CIS 9.1.1)
-
-- name: Auditar logging de Firewall
-  ansible.windows.win_shell: Get-NetFirewallProfile -Name Domain | Select-Object -Property LogAllowed, LogBlocked, LogIgnored | ConvertTo-Json
-  args:
-    executable: powershell.exe
-  register: fw_logging
-  changed_when: false
-  # Comentario: Logging debe estar True para drops (CIS 9.3.1)
-
-- name: Registrar resultados Firewall
-  set_fact:
-    audit_results: "{{ audit_results | combine({ 'firewall': {
-      'profiles_enabled': fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', $true) | list | length == 3,
-      'logging_enabled': (fw_logging.stdout | from_json).LogBlocked == $true} }) }}"
-  # Comentario: Severidad alta si profiles disabled, permite inbound attacks.
+- name: Registrar resultados Firewall (versión segura)
+  ansible.builtin.set_fact:
+    audit_results: "{{ audit_results | default({}) | combine({
+      'firewall': {
+        'profiles': {
+          'raw_data': fw_profiles.stdout | from_json | default([]),
+          'enabled_count': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length),
+          'all_enabled': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3,
+          'compliant': (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3
+        },
+        'logging': {
+          'raw_data': fw_logging.stdout | from_json | default({}),
+          'log_blocked': (fw_logging.stdout | from_json | default({})).LogBlocked | default(false),
+          'compliant': (fw_logging.stdout | from_json | default({})).LogBlocked | default(false) == true
+        },
+        'overall_assessment': {
+          'status': 'Cumple' if (fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3 and (fw_logging.stdout | from_json | default({})).LogBlocked | default(false) else 'No cumple',
+          'severity': 'high' if not ((fw_profiles.stdout | from_json | default([]) | selectattr('Enabled', 'equalto', true) | list | length) == 3 and (fw_logging.stdout | from_json | default({})).LogBlocked | default(false)) else 'low'
+        }
+      }}) }}"

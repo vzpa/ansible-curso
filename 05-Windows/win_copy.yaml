@@ -1,5 +1,5 @@
 - name: Modulos de Ansible para Windows                                                                                                   
-  hosts: windows    
+  hosts: maquinas    
   vars_files:
     - secrets.yaml
   

@@ -1,25 +1,32 @@
----
-# Auditoría de Microsoft Defender
+- name: Verificar estado general del servicio de Windows Defender
+  ansible.windows.win_service_info:
+    name: WinDefend
+  register: windefend_service
+  ignore_errors: true
 
-- name: Verificar estado de Real-Time Protection
-  ansible.windows.win_shell: Get-MpPreference | Select-Object -Property DisableRealtimeMonitoring | ConvertTo-Json
+
+- name: Intentar obtener configuración de Defender (solo si servicio está corriendo)
+  ansible.windows.win_shell: |
+    Get-MpPreference | Select-Object -Property DisableRealtimeMonitoring, MAPSReporting, SubmitSamplesConsent | ConvertTo-Json -Compress
   args:
     executable: powershell.exe
-  register: rt_protection
+  register: defender_prefs
+  ignore_errors: true
   changed_when: false
-  # Comentario: Debe ser False (habilitado)
 
-- name: Verificar Cloud Protection
-  ansible.windows.win_shell: Get-MpPreference | Select-Object -Property MAPSReporting | ConvertTo-Json
-  args:
-    executable: powershell.exe
-  register: cloud_protection
-  changed_when: false
-  # Comentario: Debe ser 2 (Advanced)
 
-- name: Registrar resultados Defender
-  set_fact:
-    audit_results: "{{ audit_results | combine({ 'defender': {
-      'realtime_enabled': (rt_protection.stdout | from_json).DisableRealtimeMonitoring == $false,
-      'cloud_enabled': (cloud_protection.stdout | from_json).MAPSReporting == 2} }) }}"
-  # Comentario: Severidad crítica si disabled, expone a malware zero-day.
+- name: Registrar estado de Microsoft Defender (versión robusta)
+  ansible.builtin.set_fact:
+    audit_results: "{{ audit_results | default({}) | combine({
+      'defender': {
+        'service_exists': windefend_service.exists | default(false),
+        'service_status': windefend_service.state | default('Not running / Not found'),
+        'service_start_type': windefend_service.start_mode | default('Unknown'),
+        'realtime_protection': {
+          'queried_successfully': defender_prefs.rc == 0,
+          'disabled': (defender_prefs.stdout | from_json).DisableRealtimeMonitoring | default(true) if defender_prefs.rc == 0 else 'Cannot query - Defender service not running',
+          'cloud_protection_level': (defender_prefs.stdout | from_json).MAPSReporting | default('Cannot query') if defender_prefs.rc == 0 else 'Cannot query'
+        },
+        'overall_status': 'CRITICAL - Defender service NOT running' if not (windefend_service.exists | default(false)) or windefend_service.state != 'running' else 'Active',
+        'severity': 'critical' if not (windefend_service.exists | default(false)) or windefend_service.state != 'running' else 'low'
+      }}) }}"

@@ -1,5 +1,5 @@
 ---
-# Auditoría de registry
+# tasks/registry.yaml (versión corregida)
 
 - name: Auditar keys de registry
   ansible.windows.win_reg_stat:
@@ -7,17 +7,27 @@
     name: "{{ item.name }}"
   register: reg_results
   loop: "{{ critical_registry_keys }}"
-  # Comentario: Solo stat, no edit
+  # No necesitas loop_control aquí si no cambias el nombre de 'item'
 
 - name: Procesar resultados registry
-  set_fact:
-    registry_results: []
+  ansible.builtin.set_fact:
+    registry_results: >-
+      {{
+        registry_results | default([]) +
+        [{
+          'path': item.item.path,
+          'name': item.item.name,
+          'value': item.value,
+          'compliant': item.value == item.item.expected_value,
+          'severity': item.item.severity,
+          'description': item.item.description
+        }]
+      }}
   loop: "{{ reg_results.results }}"
   loop_control:
-    loop_var: reg
-    registry_results: "{{ registry_results + [{ 'path': reg.path, 'name': reg.name, 'value': reg.value, 'compliant': reg.value == critical_registry_keys[loop_index].expected_value, 'severity': critical_registry_keys[loop_index].severity, 'description': critical_registry_keys[loop_index].description }] }}"
+    loop_var: item   # ← opcional, pero recomendado si quieres claridad (en vez de 'item' por defecto)
+  # No hay nada más después de loop_control en esta tarea
 
 - name: Registrar resultados registry
-  set_fact:
+  ansible.builtin.set_fact:
     audit_results: "{{ audit_results | combine({ 'registry': registry_results }) }}"
-  # Comentario: Enfocado en keys que mitigan zero-days como credential dumping.

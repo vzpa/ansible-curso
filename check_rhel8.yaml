@@ -1,6 +1,6 @@
 ---
 - name: Chequeo básico de localhost RHEL8
-  hosts: localhost
+  hosts: linux
   gather_facts: yes
   become: true
 

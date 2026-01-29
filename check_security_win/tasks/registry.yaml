@@ -1,5 +1,5 @@
 ---
-# tasks/registry.yaml (versión corregida)
+# tasks/registry.yml – Versión corregida y segura
 
 - name: Auditar keys de registry
   ansible.windows.win_reg_stat:
@@ -7,27 +7,34 @@
     name: "{{ item.name }}"
   register: reg_results
   loop: "{{ critical_registry_keys }}"
-  # No necesitas loop_control aquí si no cambias el nombre de 'item'
+  ignore_errors: true   # Permite continuar aunque alguna clave falle por permisos o no exista
+  failed_when: false    # No marca la tarea como fallida aunque haya errores individuales
 
-- name: Procesar resultados registry
+- name: Procesar resultados registry (seguro)
   ansible.builtin.set_fact:
     registry_results: >-
       {{
         registry_results | default([]) +
-        [{
+        reg_results.results | default([]) | map('json_query', {
           'path': item.item.path,
           'name': item.item.name,
-          'value': item.value,
-          'compliant': item.value == item.item.expected_value,
-          'severity': item.item.severity,
-          'description': item.item.description
-        }]
+          'value': item.value | default('Not set'),
+          'exists': item.exists | default(false),
+          'compliant': (item.exists | default(false)) and (item.value | default(0) == item.item.expected_value | default(0)),
+          'severity': item.item.severity | default('medium'),
+          'description': item.item.description | default('No description')
+        }) | list
       }}
-  loop: "{{ reg_results.results }}"
-  loop_control:
-    loop_var: item   # ← opcional, pero recomendado si quieres claridad (en vez de 'item' por defecto)
-  # No hay nada más después de loop_control en esta tarea
+  when: reg_results.results is defined
 
-- name: Registrar resultados registry
+- name: Registrar resultados registry en audit_results
   ansible.builtin.set_fact:
-    audit_results: "{{ audit_results | combine({ 'registry': registry_results }) }}"
+    audit_results: "{{ audit_results | default({}) | combine({
+      'registry': registry_results | default([])}) }}"
+
+- name: Debug temporal de registry (opcional – quítalo después)
+  ansible.builtin.debug:
+    msg:
+      reg_results_exists: "{{ reg_results.results is defined }}"
+      reg_results_count: "{{ reg_results.results | default([]) | length }}"
+      registry_results_sample: "{{ registry_results | default([]) | first | default('empty') }}"

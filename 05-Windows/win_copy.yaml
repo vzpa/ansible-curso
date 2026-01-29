@@ -1,8 +1,6 @@
 - name: Modulos de Ansible para Windows
-  hosts: maquinas
+  hosts: windows
 
-  vars_files:
-    - secrets.yaml
 
   tasks:
     - name: Crear directorio si no existe

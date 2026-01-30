@@ -1,0 +1,15 @@
+---
+- name: Obtener informacion del disco C
+  hosts: windows
+  gather_facts: no
+
+  tasks:
+    - name: Obtener facts del sistema
+      ansible.windows.setup:
+
+    - name: Mostrar info del disco C
+      debug:
+        msg:
+          - "Disco: C:"
+          - "Total: {{ ansible_facts.mounts | selectattr('mount', 'equalto', 'C:') | map(attribute='size_total') | first | filesizeformat }}"
+          - "Libre: {{ ansible_facts.mounts | selectattr('mount', 'equalto', 'C:') | map(attribute='size_available') | first | filesizeformat }}"

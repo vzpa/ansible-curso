@@ -57,14 +57,16 @@
         firstname: "{{ item.firstname }}"
         lastname: "{{ item.lastname }}"
         email: "{{ item.email }}"
-        password: "{{default_password}}"
+        password: "{{ default_password }}"
         enabled: true
-        password_expired: true   # ← equivalente a "change password at logon"
-        path: "{{base_ou}}"
-
+        password_expired: true   # Change password at logon
+    
+        path: "OU={{ item.department }},{{ base_ou }}"
+    
         attributes:
           department: "{{ item.department }}"
           title: "{{ item.title }}"
+    
+      loop: "{{ ad_users }}"
 
-      loop: "{{base_ou}}"
 

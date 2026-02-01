@@ -12,19 +12,19 @@
       - username: jperez
         firstname: Juan
         lastname: Pérez
-        email: jperez@"{{domain}}"
+        email: jperez@{{domain}}
         department: IT
         title: Desarrollador
       - username: mgarcia
         firstname: María
         lastname: García
-        email: mgarcia@"{{domain}}"
+        email: mgarcia@{{domain}}
         department: RecursosHumanos
         title: Gerente de RRHH
       - username: clopez
         firstname: Carlos
         lastname: López
-        email: clopez@"{{domain}}"
+        email: clopez@{{domain}}
         department: Ventas
         title: Ejecutivo de Ventas
   tasks:

@@ -1,0 +1,69 @@
+---
+- name: Crear múltiples usuarios en Active Directory
+  hosts: windows
+  gather_facts: false
+  
+  vars:
+    # OU base donde se crearán los usuarios
+    base_ou: "CN=Users,DC=vzpaD,DC=info"
+    
+    # Contraseña por defecto (se debe cambiar en el primer inicio de sesión)
+    default_password: "P@ssw0rd123!"
+    
+    # Lista de usuarios a crear
+    ad_users:
+      - username: jperez
+        firstname: Juan
+        lastname: Pérez
+        email: jperez@example.com
+        department: IT
+        title: Desarrollador
+        
+      - username: mgarcia
+        firstname: María
+        lastname: García
+        email: mgarcia@example.com
+        department: RRHH
+        title: Gerente de RRHH
+        
+      - username: clopez
+        firstname: Carlos
+        lastname: López
+        email: clopez@example.com
+        department: Ventas
+        title: Ejecutivo de Ventas
+
+  tasks:
+    - name: Crear usuarios en Active Directory
+      microsoft.ad.user:
+        name: "{{ item.username }}"
+        firstname: "{{ item.firstname }}"
+        surname: "{{ item.lastname }}"
+        password: "{{ default_password }}"
+        state: present
+        path: "{{ base_ou }}"
+        upn: "{{ item.email }}"
+        email: "{{ item.email }}"
+        company: "Mi Empresa"
+        department: "{{ item.department | default(omit) }}"
+        title: "{{ item.title | default(omit) }}"
+        password_never_expires: false
+        user_cannot_change_password: false
+        change_password_at_logon: true
+        enabled: true
+        description: "Creado automáticamente por Ansible"
+      loop: "{{ ad_users }}"
+      loop_control:
+        label: "{{ item.username }}"
+      
+    - name: Agregar usuarios a grupos específicos (opcional)
+      microsoft.ad.group:
+        name: "Domain Users"
+        members:
+          add:
+            - "{{ item.username }}"
+        state: present
+      loop: "{{ ad_users }}"
+      loop_control:
+        label: "{{ item.username }}"
+      when: item.add_to_groups is defined

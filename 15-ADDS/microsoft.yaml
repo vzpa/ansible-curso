@@ -3,6 +3,7 @@
   hosts: windows
   gather_facts: false
   vars:
+    domain: "vzpaD.info"
     domain_dn: "DC=vzpaD,DC=info"
     # OU raíz para departamentos
     base_ou: "OU=Departamentos,{{ domain_dn }}"
@@ -11,19 +12,19 @@
       - username: jperez
         firstname: Juan
         lastname: Pérez
-        email: jperez@example.com
+        email: jperez@"{{domain}}"
         department: IT
         title: Desarrollador
       - username: mgarcia
         firstname: María
         lastname: García
-        email: mgarcia@example.com
+        email: mgarcia@"{{domain}}"
         department: RecursosHumanos
         title: Gerente de RRHH
       - username: clopez
         firstname: Carlos
         lastname: López
-        email: clopez@example.com
+        email: clopez@"{{domain}}"
         department: Ventas
         title: Ejecutivo de Ventas
   tasks:
@@ -47,7 +48,7 @@
       microsoft.ad.user:
         name: "{{ item.firstname }} {{ item.lastname }}"
         sam_account_name: "{{ item.username }}"
-        upn: "{{ item.username }}@vzpaD.info"
+        upn: "{{ item.username }}@"{{domain}}""
         
         firstname: "{{ item.firstname }}"
         lastname: "{{ item.lastname }}"

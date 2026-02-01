@@ -57,10 +57,10 @@
         firstname: "{{ item.firstname }}"
         lastname: "{{ item.lastname }}"
         email: "{{ item.email }}"
-        password: "P@ssw0rd123!"
+        password: "{{default_password}}"
         enabled: true
         password_expired: true   # ← equivalente a "change password at logon"
-        path: "OU=Usuarios,DC=vzpaD,DC=info"
+        path: "{{base_ou:}}"
 
         attributes:
           department: "{{ item.department }}"

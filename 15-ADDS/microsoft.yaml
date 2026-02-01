@@ -48,7 +48,7 @@
       microsoft.ad.user:
         name: "{{ item.firstname }} {{ item.lastname }}"
         sam_account_name: "{{ item.username }}"
-        upn: "{{ item.username }}@"{{domain}}"
+        upn: "{{ item.username }}"@"{{domain}}"
         
         firstname: "{{ item.firstname }}"
         lastname: "{{ item.lastname }}"

@@ -82,3 +82,10 @@
         scope: global
         path: OU=groups,DC=vzpaD,DC=info
         state: present
+
+    - name: Agregar usuarios de Departamentos al grupo EmployerInternal_VZPADINFO
+      microsoft.ad.group:
+        name: "EmployerInternal_VZPADINFO"
+        members:
+          add: "{{ ad_users | map(attribute='username') | list }}"
+        state: present

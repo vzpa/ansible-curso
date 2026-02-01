@@ -66,5 +66,5 @@
           department: "{{ item.department }}"
           title: "{{ item.title }}"
 
-      loop: "{{ usuarios }}"
+      loop: "{{ users }}"
 

@@ -60,11 +60,11 @@
         password: "{{default_password}}"
         enabled: true
         password_expired: true   # ← equivalente a "change password at logon"
-        path: "{{base_ou:}}"
+        path: "{{base_ou}}"
 
         attributes:
           department: "{{ item.department }}"
           title: "{{ item.title }}"
 
-      loop: "{{ users }}"
+      loop: "{{base_ou}}"
 

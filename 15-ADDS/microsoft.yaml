@@ -2,46 +2,39 @@
 - name: Crear OUs por departamento y usuarios en Active Directory
   hosts: windows
   gather_facts: false
-
   vars:
+    domain: "vzpaD.info"
     domain_dn: "DC=vzpaD,DC=info"
-
     # OU raíz para departamentos
     base_ou: "OU=Departamentos,{{ domain_dn }}"
-
     default_password: "P@ssw0rd123!"
-
     ad_users:
       - username: jperez
         firstname: Juan
         lastname: Pérez
-        email: jperez@example.com
+        email: jperez@{{domain}}
         department: IT
         title: Desarrollador
-
       - username: mgarcia
         firstname: María
         lastname: García
-        email: mgarcia@example.com
+        email: mgarcia@{{domain}}
         department: RecursosHumanos
         title: Gerente de RRHH
-
       - username: clopez
         firstname: Carlos
         lastname: López
-        email: clopez@example.com
+        email: clopez@{{domain}}
         department: Ventas
         title: Ejecutivo de Ventas
-
   tasks:
-
     # 1️⃣ Crear OU raíz "Departamentos"
     - name: Crear OU raíz Departamentos si no existe
       microsoft.ad.ou:
         name: "Departamentos"
         path: "{{ domain_dn }}"
         state: present
-
+    
     # 2️⃣ Crear OUs por departamento (únicos)
     - name: Crear OUs por departamento
       microsoft.ad.ou:
@@ -49,26 +42,43 @@
         path: "{{ base_ou }}"
         state: present
       loop: "{{ ad_users | map(attribute='department') | unique | list }}"
-
-    # 3️⃣ Crear usuarios en su OU correspondiente
+    
+    # 3️⃣ Crear usuarios en Active Directory
     - name: Crear usuarios en Active Directory
       microsoft.ad.user:
-        name: "{{ item.username }}"
+        name: "{{ item.firstname }} {{ item.lastname }}"
+        sam_account_name: "{{ item.username }}"
+        upn: "{{ item.username }}@vzpaD.info"
+        
         firstname: "{{ item.firstname }}"
-        surname: "{{ item.lastname }}"
-        password: "{{ default_password }}"
-        state: present
-        path: "OU={{ item.department }},{{ base_ou }}"
-        upn: "{{ item.email }}"
+        lastname: "{{ item.lastname }}"
         email: "{{ item.email }}"
-        company: "Mi Empresa"
-        department: "{{ item.department }}"
-        title: "{{ item.title | default(omit) }}"
-        password_never_expires: false
-        user_cannot_change_password: false
-        change_password_at_logon: true
+        
+        password: "{{ default_password }}"
         enabled: true
-        description: "Creado automáticamente por Ansible"
+        password_expired: true
+        
+        path: "OU={{ item.department }},{{ base_ou }}"
+        
+        attributes:
+          set:
+            department: "{{ item.department }}"
+            title: "{{ item.title }}"
+        
+        state: present
       loop: "{{ ad_users }}"
-      loop_control:
-        label: "{{ item.username }}"
+
+    - name: Ensure OU is present & protected
+      microsoft.ad.ou:
+        name: groups
+        path: DC=vzpaD,DC=info
+        state: present
+        protect_from_deletion: true
+
+
+    - name: Create a group in a custom path
+      microsoft.ad.group:
+        name: EmployerInternal_VZPADINFO
+        scope: global
+        path: OU=groups,DC=vzpaD,DC=info
+        state: present

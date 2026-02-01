@@ -67,18 +67,5 @@
         
         state: present
       loop: "{{ ad_users }}"
-
-    - name: Ensure OU is present & protected
-      microsoft.ad.ou:
-        name: groups
-        path: DC=vzpaD,DC=info
-        state: present
-        protect_from_deletion: true
-
-
-    - name: Create a group in a custom path
-      microsoft.ad.group:
-        name: EmployerInternal_VZPADINFO
-        scope: global
-        path: OU=groups,DC=vzpaD,DC=info
-        state: present
+      loop_control:
+        label: "{{ item.username }}"

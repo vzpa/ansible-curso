@@ -54,19 +54,24 @@
       microsoft.ad.user:
         name: "{{ item.firstname }} {{ item.lastname }}"
         sam_account_name: "{{ item.username }}"
+        user_principal_name: "{{ item.username }}@vzpaD.info"
+    
         firstname: "{{ item.firstname }}"
         lastname: "{{ item.lastname }}"
         email: "{{ item.email }}"
+    
         password: "{{ default_password }}"
         enabled: true
-        password_expired: true   # Change password at logon
+        password_expired: true
     
         path: "OU={{ item.department }},{{ base_ou }}"
     
         attributes:
-          department: "{{ item.department }}"
-          title: "{{ item.title }}"
+          set:
+            department: "{{ item.department }}"
+            title: "{{ item.title }}"
     
       loop: "{{ ad_users }}"
+
 
 

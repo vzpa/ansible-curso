@@ -2,15 +2,11 @@
 - name: Crear OUs por departamento y usuarios en Active Directory
   hosts: windows
   gather_facts: false
-
   vars:
     domain_dn: "DC=vzpaD,DC=info"
-
     # OU raíz para departamentos
     base_ou: "OU=Departamentos,{{ domain_dn }}"
-
     default_password: "P@ssw0rd123!"
-
     ad_users:
       - username: jperez
         firstname: Juan
@@ -18,30 +14,26 @@
         email: jperez@example.com
         department: IT
         title: Desarrollador
-
       - username: mgarcia
         firstname: María
         lastname: García
         email: mgarcia@example.com
         department: RecursosHumanos
         title: Gerente de RRHH
-
       - username: clopez
         firstname: Carlos
         lastname: López
         email: clopez@example.com
         department: Ventas
         title: Ejecutivo de Ventas
-
   tasks:
-
     # 1️⃣ Crear OU raíz "Departamentos"
     - name: Crear OU raíz Departamentos si no existe
       microsoft.ad.ou:
         name: "Departamentos"
         path: "{{ domain_dn }}"
         state: present
-
+    
     # 2️⃣ Crear OUs por departamento (únicos)
     - name: Crear OUs por departamento
       microsoft.ad.ou:
@@ -49,29 +41,28 @@
         path: "{{ base_ou }}"
         state: present
       loop: "{{ ad_users | map(attribute='department') | unique | list }}"
-
+    
+    # 3️⃣ Crear usuarios en Active Directory
     - name: Crear usuarios en Active Directory
       microsoft.ad.user:
         name: "{{ item.firstname }} {{ item.lastname }}"
         sam_account_name: "{{ item.username }}"
-        user_principal_name: "{{ item.username }}@vzpaD.info"
-    
+        upn: "{{ item.username }}@vzpaD.info"
+        
         firstname: "{{ item.firstname }}"
         lastname: "{{ item.lastname }}"
         email: "{{ item.email }}"
-    
+        
         password: "{{ default_password }}"
         enabled: true
         password_expired: true
-    
+        
         path: "OU={{ item.department }},{{ base_ou }}"
-    
+        
         attributes:
           set:
             department: "{{ item.department }}"
             title: "{{ item.title }}"
-    
+        
+        state: present
       loop: "{{ ad_users }}"
-
-
-

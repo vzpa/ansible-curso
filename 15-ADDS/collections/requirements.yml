@@ -1,3 +1,4 @@
 collections:
   - name: microsoft.ad
     version: 1.10.0 # O la versión deseada
+  - name: community.windows

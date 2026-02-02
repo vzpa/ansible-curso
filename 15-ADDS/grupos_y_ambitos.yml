@@ -88,16 +88,23 @@
           Select-Object -ExpandProperty SamAccountName
       register: ou_users
       
-    - name: Agregar usuarios de la OU al grupo AD (PowerShell fallback)
+    - name: Agregar usuarios de la OU Ventas al grupo
       ansible.windows.win_powershell:
         script: |
           Import-Module ActiveDirectory
-          $users = {{ ou_users.output | to_json }}
-          foreach ($u in $users) {
-            try {
-              Add-ADGroupMember -Identity "{{ target_group }}" -Members $u
-            } catch {
-              Write-Output "Usuario $u ya pertenece al grupo o error"
+    
+          $group = "IT-Mail"
+          $ou = "OU=Ventas,DC=empresa,DC=local"
+    
+          $users = Get-ADUser -SearchBase $ou -Filter *
+    
+          foreach ($user in $users) {
+            if (-not (Get-ADGroupMember -Identity $group -Recursive |
+                      Where-Object {$_.DistinguishedName -eq $user.DistinguishedName})) {
+    
+              Add-ADGroupMember -Identity $group -Members $user
             }
           }
+
+
 

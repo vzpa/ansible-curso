@@ -1,0 +1,27 @@
+---
+- name: Unir Windows al dominio AD
+  hosts: windows
+  gather_facts: no
+  vars:
+    domain_name: "vzpaD.info"
+    domain_user: "Administrator@vzpaD.info"
+    domain_pass: "Vzpad123*"
+  
+  tasks:
+    - name: Asegurar que el servidor DNS es el controlador de dominio
+      win_dns_client:
+        adapter_names: '*'
+        ipv4_addresses: ['192.168.99.100'] # IP del Controlador de Dominio
+
+    - name: Unir máquina al dominio
+      win_domain_membership:
+        dns_domain_name: "{{ domain_name }}"
+        domain_admin_user: "{{ domain_user }}"
+        domain_admin_password: "{{ domain_pass }}"
+        state: domain
+      register: join_domain
+
+    - name: Reiniciar máquina si se unió al dominio
+      win_reboot:
+        msg: "Reiniciando para completar la unión al dominio"
+      when: join_domain.reboot_required

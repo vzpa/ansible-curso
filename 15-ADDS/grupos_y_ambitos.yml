@@ -76,11 +76,7 @@
               -SamAccountName "IT-Mail" `
               -GroupScope Universal `
               -GroupCategory Distribution `
-<<<<<<< HEAD
               -Path "OU=groups,DC=vzpaD,DC=info"
-=======
-              -Path "OU=Grupos,DC=empresa,DC=local"
->>>>>>> ae73d7b13e37dd57f1d37b24a460329e71fa2195
           }
 
 
@@ -92,21 +88,13 @@
           Select-Object -ExpandProperty SamAccountName
       register: ou_users
       
-<<<<<<< HEAD
     - name: Agregar usuarios de la OU IT al grupo
-=======
-    - name: Agregar usuarios de la OU Ventas al grupo
->>>>>>> ae73d7b13e37dd57f1d37b24a460329e71fa2195
       ansible.windows.win_powershell:
         script: |
           Import-Module ActiveDirectory
     
           $group = "IT-Mail"
-<<<<<<< HEAD
           $ou = "OU=groups,DC=vzpaD,DC=info""
-=======
-          $ou = "OU=Ventas,DC=empresa,DC=local"
->>>>>>> ae73d7b13e37dd57f1d37b24a460329e71fa2195
     
           $users = Get-ADUser -SearchBase $ou -Filter *
     

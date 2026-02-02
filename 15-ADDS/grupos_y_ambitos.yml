@@ -84,7 +84,7 @@
       register: ou_users
 
     - name: Agregar usuarios de la OU al grupo AD
-      ansible.windows.win_domain_group_membership:
+      community.windows.win_domain_group_membership:
         name: "{{ target_group }}"
         members: "{{ ou_users.output }}"
         state: present

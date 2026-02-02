@@ -13,7 +13,7 @@
       microsoft.ad.group:
         name: Impresora_ventas
         category: security
-        scope: local
+        scope: domainlocal
         path: OU=groups,DC=vzpaD,DC=info
         state: present
 
@@ -29,7 +29,7 @@
       microsoft.ad.group:
         name: Impresora_RRHH
         category: security
-        scope: local
+        scope: domainlocal
         path: OU=groups,DC=vzpaD,DC=info
         state: present
 
@@ -45,7 +45,7 @@
       microsoft.ad.group:
         name: Impresora_IT
         category: security
-        scope: local
+        scope: domainlocal
         path: OU=groups,DC=vzpaD,DC=info
         state: present
 

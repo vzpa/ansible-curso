@@ -65,15 +65,20 @@
         path: OU=groups,DC=vzpaD,DC=info
         state: present
 
-    - name: Grupo de distribucción para correos de IT
-      microsoft.ad.group:
-          name: HelpDesk_IT
-          scope: global
-          category: distribution
-          attributes:
-            set:
-              mail: helpdesk@vzpaD.info
-          protect_from_deletion: true
+    - name: Crear grupo de distribución para IT
+      ansible.windows.win_powershell:
+        script: |
+          Import-Module ActiveDirectory
+    
+          if (-not (Get-ADGroup -Filter "Name -eq 'IT-Mail'" -ErrorAction SilentlyContinue)) {
+            New-ADGroup `
+              -Name "IT-Mail" `
+              -SamAccountName "IT-Mail" `
+              -GroupScope Universal `
+              -GroupCategory Distribution `
+              -Path "OU=Grupos,DC=empresa,DC=local"
+          }
+
 
     - name: Obtener usuarios de una OU de IT
       ansible.windows.win_powershell:

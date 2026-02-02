@@ -94,7 +94,7 @@
           Import-Module ActiveDirectory
     
           $group = "IT-Mail"
-          $ou = "OU=groups,DC=vzpaD,DC=info""
+          $ou = "{{target_ou}}"
     
           $users = Get-ADUser -SearchBase $ou -Filter *
     

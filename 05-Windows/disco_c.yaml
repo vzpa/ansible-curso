@@ -1,14 +1,17 @@
----
-- name: Obtener informacion del disco C
-  hosts: windows
+    - name: Obtener datos de disco vía PowerShell
+      ansible.windows.win_powershell:
+        script: |
+          $drive = Get-PSDrive C
+          $ansible_view = @{
+            total = $drive.Used + $drive.Free
+            free  = $drive.Free
+          }
+          $ansible_view
+      register: info_disco
 
-  tasks:
-    - name: Obtener facts del sistema
-      ansible.windows.setup:
-
-    - name: Mostrar info del disco C
+    - name: Mostrar resultado formateado
       ansible.builtin.debug:
         msg:
           - "Disco: C:"
-          - "Total: {{ ansible_facts.mounts | selectattr('mount', 'equalto', 'C:') | map(attribute='size_total') | first | filesizeformat }}"
-          - "Libre: {{ ansible_facts.mounts | selectattr('mount', 'equalto', 'C:') | map(attribute='size_available') | first | filesizeformat }}"
+          - "Total: {{ info_disco.output[0].total | filesizeformat }}"
+          - "Libre: {{ info_disco.output[0].free | filesizeformat }}"

@@ -1,29 +1,24 @@
 ---
-- name: IronClad Compliance Check
+- name: IronClad Security Framework - Execution
   hosts: windows
   become: false
-  gather_facts: no
+  gather_facts: yes
 
   vars_files:
     - ../vars/main.yml
 
   tasks:
-    - name: Ejecutar script de validación de cumplimiento
-      ansible.windows.win_shell: |
-        powershell.exe -ExecutionPolicy Bypass -File "{{ playbook_dir }}/../scripts/setup_winrm.ps1"
-      register: compliance_check
-      ignore_errors: yes
+    - name: Fase 1 - Auditoría de cumplimiento
+      include_role:
+        name: audit
+      when: not (skip_audit | default(false) | bool)
 
-    - name: Crear directorio de logs si no existe
-      ansible.windows.win_file:
-        path: "{{ log_path }}"
-        state: directory
+    - name: Fase 2 - Hardening del sistema
+      include_role:
+        name: hardening
+      when: not (skip_hardening | default(false) | bool)
 
-    - name: Guardar resultado en compliance.log
-      ansible.windows.win_copy:
-        content: "{{ compliance_check.stdout | default('No output') }}"
-        dest: "{{ log_path }}compliance.log"
-
-    - name: Mostrar resultado en consola AWX
-      debug:
-        msg: "{{ compliance_check.stdout | default('No output') }}"
+    - name: Fase 3 - Verificación de cumplimiento
+      include_role:
+        name: compliance
+      when: not (skip_compliance | default(false) | bool)

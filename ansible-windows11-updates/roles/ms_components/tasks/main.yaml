@@ -1,0 +1,41 @@
+- block:
+    - name: Crear carpeta de logs si no existe
+      ansible.windows.win_shell: |
+        if (-Not (Test-Path "{{ log_path }}")) {
+          New-Item -ItemType Directory -Path "{{ log_path }}"
+        }
+
+    - name: Actualizar componentes Microsoft definidos en vars.yaml
+      ansible.windows.win_shell: |
+        $components = {{ ms_components | to_json }}
+        foreach ($comp in $components) {
+          try {
+            winget upgrade --id $comp --silent --accept-source-agreements --accept-package-agreements
+            Add-Content -Path "{{ report_file }}" -Value "Componente actualizado: $comp"
+          } catch {
+            Add-Content -Path "{{ report_file }}" -Value "Error al actualizar componente: $comp"
+          }
+        }
+
+    - name: Actualizar aplicaciones de Microsoft Store
+      ansible.windows.win_shell: |
+        try {
+          Get-AppxPackage -AllUsers | ForEach-Object {
+            try {
+              winget upgrade --id $_.Name --silent --accept-source-agreements --accept-package-agreements
+              Add-Content -Path "{{ report_file }}" -Value "Store app actualizada: $($_.Name)"
+            } catch {
+              Add-Content -Path "{{ report_file }}" -Value "Error al actualizar Store app: $($_.Name)"
+            }
+          }
+        } catch {
+          Add-Content -Path "{{ report_file }}" -Value "Error general en Microsoft Store updates"
+        }
+  rescue:
+    - name: Registrar error en reporte
+      ansible.windows.win_shell: |
+        Add-Content -Path "{{ report_file }}" -Value "Error en rol Microsoft Components"
+  always:
+    - name: Confirmar finalización de rol Microsoft Components
+      ansible.windows.win_shell: |
+        Add-Content -Path "{{ report_file }}" -Value "Finalizó rol Microsoft Components"

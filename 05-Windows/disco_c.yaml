@@ -1,6 +1,7 @@
-    - name: Obtener datos de disco vía PowerShell
-      ansible.windows.win_powershell:
-        script: |
+---
+- name: Obtener datos de disco vía PowerShell
+  ansible.windows.win_powershell:
+    script: |
           $drive = Get-PSDrive C
           $ansible_view = @{
             total = $drive.Used + $drive.Free
@@ -8,10 +9,9 @@
           }
           $ansible_view
       register: info_disco
-
-    - name: Mostrar resultado formateado
-      ansible.builtin.debug:
-        msg:
+- name: Mostrar resultado formateado
+  ansible.builtin.debug:
+    msg:
           - "Disco: C:"
           - "Total: {{ info_disco.output[0].total | filesizeformat }}"
           - "Libre: {{ info_disco.output[0].free | filesizeformat }}"

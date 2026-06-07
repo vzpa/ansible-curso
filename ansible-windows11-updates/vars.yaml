@@ -1,25 +1,43 @@
-# Variables globales para el proyecto
-
 log_path: "C:\\Logs\\ansible_updates\\"
 report_file: "{{ log_path }}report.txt"
 
-# Lista de aplicaciones a actualizar con Winget
 winget_apps:
   - Brave
   - Google Chrome
+  - Mozilla Firefox
   - Microsoft Edge
-  - Copilot
   - Steam
   - EA App
   - Ubisoft Connect
+  - Ubisoft Game Launcher
   - Rockstar Games Launcher
+  - Epic Games Launcher
+  - Epic Online Services
   - NoxPlayer
   - WinSCP
   - Wireshark
   - Vagrant
   - Python Launcher
+  - Visual Studio Code
+  - Git
+  - VMware Workstation
+  - PuTTY
+  - 7-Zip
+  - VLC
   - MSI Afterburner
   - RivaTuner Statistics Server
   - Lightshot
   - TeraBox
   - Npcap
+
+ms_components:
+  - Copilot
+  - Microsoft WebView2 Runtime
+  - Microsoft .NET Framework
+  - Microsoft Visual C++ Redistributables
+  - Microsoft Teams
+  - OneDrive
+  - OneNote
+  - Office / Microsoft 365
+  - PowerShell
+  - WindowsAppRuntime

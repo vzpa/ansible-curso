@@ -1,6 +1,3 @@
-# Playbook principal para ejecutar desde AWX/Tower
-# Orquesta los roles de actualización y reporte
-
 - name: Actualización completa de Windows 11
   hosts: windows
   gather_facts: no
@@ -15,6 +12,10 @@
     - name: Ejecutar actualizaciones de aplicaciones con Winget
       include_role:
         name: winget_updates
+
+    - name: Ejecutar actualizaciones de Microsoft Store y componentes
+      include_role:
+        name: ms_components
 
     - name: Generar reporte final
       include_role:

@@ -5,7 +5,7 @@
           New-Item -ItemType Directory -Path "{{ log_path }}"
         }
 
-    - name: Instalar todas las actualizaciones disponibles
+    - name: Ejecutar Windows Update
       ansible.windows.win_updates:
         category_names:
           - SecurityUpdates
@@ -20,7 +20,19 @@
         log_path: "{{ log_path }}win_updates.log"
       register: win_updates_result
 
-    - name: Registrar resultado en archivo
+    - name: Registrar resultado en reporte
       ansible.windows.win_shell: |
-        Add-Content -Path "{{ report_file }}" -Value "Windows Updates instaladas: {{ win_updates_result.updates | default([]) }}"
+        if ("{{ win_updates_result.updates | length }}" -eq 0) {
+          Add-Content -Path "{{ report_file }}" -Value "No había actualizaciones pendientes en Windows Update."
+        } else {
+          Add-Content -Path "{{ report_file }}" -Value "Windows Updates instaladas: {{ win_updates_result.updates }}"
+        }
         Add-Content -Path "{{ report_file }}" -Value "Reinicio requerido: {{ win_updates_result.reboot_required }}"
+  rescue:
+    - name: Registrar error en reporte
+      ansible.windows.win_shell: |
+        Add-Content -Path "{{ report_file }}" -Value "Error en Windows Update: {{ ansible_failed_result }}"
+  always:
+    - name: Confirmar finalización de rol Windows Updates
+      ansible.windows.win_shell: |
+        Add-Content -Path "{{ report_file }}" -Value "Finalizó rol Windows Updates"

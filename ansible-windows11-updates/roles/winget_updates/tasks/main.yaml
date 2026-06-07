@@ -5,13 +5,30 @@
           New-Item -ItemType Directory -Path "{{ log_path }}"
         }
 
-    - name: Actualizar aplicaciones definidas en vars.yaml
+    - name: Ejecutar actualización masiva con Winget
       ansible.windows.win_shell: |
-        foreach ($app in {{ winget_apps | to_json }}) {
-          try {
-            winget upgrade --id $app --silent --accept-source-agreements --accept-package-agreements
-            Add-Content -Path "{{ report_file }}" -Value "Aplicación actualizada: $app"
-          } catch {
-            Add-Content -Path "{{ report_file }}" -Value "Error al actualizar: $app"
+        $result = winget upgrade --all --silent --accept-source-agreements --accept-package-agreements
+        foreach ($line in $result) {
+          if ($line -match "^\S") {
+            Add-Content -Path "{{ report_file }}" -Value "Winget salida: $line"
           }
         }
+
+    - name: Registrar aplicaciones realmente actualizadas
+      ansible.windows.win_shell: |
+        $result = winget upgrade
+        foreach ($line in $result) {
+          if ($line -match "Upgraded") {
+            Add-Content -Path "{{ report_file }}" -Value "Aplicación actualizada: $line"
+          } elseif ($line -match "No applicable update") {
+            Add-Content -Path "{{ report_file }}" -Value "Aplicación ya estaba en la última versión: $line"
+          }
+        }
+  rescue:
+    - name: Registrar error en reporte
+      ansible.windows.win_shell: |
+        Add-Content -Path "{{ report_file }}" -Value "Error en Winget Updates"
+  always:
+    - name: Confirmar finalización de rol Winget Updates
+      ansible.windows.win_shell: |
+        Add-Content -Path "{{ report_file }}" -Value "Finalizó rol Winget Updates"

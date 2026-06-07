@@ -8,7 +8,7 @@
             free  = $drive.Free
           }
           $ansible_view
-      register: info_disco
+    register: info_disco
 - name: Mostrar resultado formateado
   ansible.builtin.debug:
     msg:

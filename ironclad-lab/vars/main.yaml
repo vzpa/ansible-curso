@@ -1,6 +1,0 @@
----
-log_path: "C:\\Logs\\ironclad\\"
-firewall_profiles:
-  - Domain
-  - Private
-  - Public

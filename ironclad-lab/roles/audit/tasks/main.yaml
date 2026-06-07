@@ -1,0 +1,16 @@
+---
+- name: Audit - Verificar estado de Defender
+  win_shell: |
+    Get-MpComputerStatus | Select-Object -Property RealTimeProtectionEnabled, AntivirusEnabled | ConvertTo-Json
+  register: defender_audit
+
+- name: Audit - Verificar estado de Firewall
+  win_shell: |
+    Get-NetFirewallProfile | Select-Object Name, Enabled | ConvertTo-Json
+  register: firewall_audit
+
+- name: Mostrar reporte en consola de AWX
+  debug:
+    msg:
+      - "Defender Config: {{ defender_audit.stdout | from_json }}"
+      - "Firewall Config: {{ firewall_audit.stdout | from_json }}"

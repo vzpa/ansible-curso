@@ -1,0 +1,22 @@
+---
+- name: Hardening - Asegurar Microsoft Defender activo
+  win_defender:
+    state: enabled
+    realtime_protection: yes
+
+- name: Hardening - Aplicar política estricta de Firewall
+  win_firewall:
+    state: enabled
+    profiles:
+      - Domain
+      - Private
+      - Public
+    default_inbound_policy: block
+    default_outbound_policy: allow
+
+- name: Hardening - Deshabilitar Telnet si está presente
+  win_service:
+    name: TlntSvr
+    state: stopped
+    start_mode: disabled
+  ignore_errors: yes # Idempotencia: el servicio podría no estar instalado

@@ -1,22 +1,25 @@
----
 - name: Hardening - Asegurar Microsoft Defender activo
-  win_defender:
-    state: enabled
-    realtime_protection: yes
+  # Se utiliza win_powershell porque no hay un módulo nativo "win_defender"
+  ansible.windows.win_powershell:
+    script: |
+      Set-MpPreference -DisableRealtimeMonitoring $false
+      Set-MpPreference -DisableBehaviorMonitoring $false
 
 - name: Hardening - Aplicar política estricta de Firewall
-  win_firewall:
+  # El módulo correcto para perfiles globales es ansible.windows.win_firewall
+  ansible.windows.win_firewall:
     state: enabled
     profiles:
       - Domain
       - Private
       - Public
-    default_inbound_policy: block
-    default_outbound_policy: allow
+    inbound_action: block
+    outbound_action: allow
 
 - name: Hardening - Deshabilitar Telnet si está presente
-  win_service:
+  # El módulo win_service es correcto, pero asegúrate de usar el FQCN
+  ansible.windows.win_service:
     name: TlntSvr
     state: stopped
     start_mode: disabled
-  ignore_errors: yes # Idempotencia: el servicio podría no estar instalado
+  ignore_errors: yes

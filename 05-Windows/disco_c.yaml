@@ -1,5 +1,5 @@
 ---
-- name: Obtener datos de disco vía PowerShell
+- name: Obtener datos de disco vía PowerShell1
   ansible.windows.win_powershell:
     script: |
       $drive = Get-PSDrive C

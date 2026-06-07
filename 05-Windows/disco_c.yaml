@@ -7,7 +7,7 @@
       ansible.windows.setup:
 
     - name: Mostrar info del disco C
-      debug:
+      ansible.builtin.debug:
         msg:
           - "Disco: C:"
           - "Total: {{ ansible_facts.mounts | selectattr('mount', 'equalto', 'C:') | map(attribute='size_total') | first | filesizeformat }}"

@@ -1,0 +1,9 @@
+# Rol para consolidar reporte final de actualizaciones
+
+- name: Generar resumen final
+  ansible.windows.win_shell: |
+    Add-Content -Path "{{ report_file }}" -Value "==== REPORTE FINAL ===="
+    Add-Content -Path "{{ report_file }}" -Value "Actualizaciones instaladas: {{ win_updates_result.updates | default([]) }}"
+    Add-Content -Path "{{ report_file }}" -Value "Aplicaciones actualizadas: {{ winget_apps }}"
+    Add-Content -Path "{{ report_file }}" -Value "Reinicio requerido: {{ win_updates_result.reboot_required }}"
+    Add-Content -Path "{{ report_file }}" -Value "==== FIN DEL REPORTE ===="

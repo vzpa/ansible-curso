@@ -1,10 +1,6 @@
 ---
-- name: Hardening - Asegurar Microsoft Defender activo
-  # Se utiliza win_powershell porque no hay un módulo nativo "win_defender"
-  ansible.windows.win_powershell:
-    script: |
-      Set-MpPreference -DisableRealtimeMonitoring $false
-      Set-MpPreference -DisableBehaviorMonitoring $false
+- name: Hardening - Activar Microsoft Defender
+  ansible.windows.win_command: powershell.exe -Command "Set-MpPreference -DisableRealtimeMonitoring $false; Set-MpPreference -DisableBehaviorMonitoring $false"
 
 - name: Hardening - Aplicar política estricta de Firewall
   # El módulo correcto para perfiles globales es ansible.windows.win_firewall

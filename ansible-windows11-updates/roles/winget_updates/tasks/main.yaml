@@ -9,43 +9,18 @@
       ansible.windows.win_shell: |
         $result = winget upgrade --all --silent --accept-source-agreements --accept-package-agreements
         foreach ($line in $result) {
-          if ($line -match "^\S") {
-            Add-Content -Path "{{ report_file }}" -Value "Winget salida: $line"
-          }
-        }
-
-    - name: Registrar aplicaciones realmente actualizadas
-      ansible.windows.win_shell: |
-        $result = winget upgrade
-        foreach ($line in $result) {
           if ($line -match "Upgraded") {
             Add-Content -Path "{{ report_file }}" -Value "Aplicación actualizada: $line"
           } elseif ($line -match "No applicable update") {
             Add-Content -Path "{{ report_file }}" -Value "Aplicación ya estaba en la última versión: $line"
-        $apps = "{{ winget_apps | join(',') }}".Split(',')
-        foreach ($app in $apps) {
-          try {
-            winget upgrade --id $app --silent --accept-source-agreements --accept-package-agreements
-            Add-Content -Path "{{ report_file }}" -Value "Aplicación actualizada: $app"
-          } catch {
-            Add-Content -Path "{{ report_file }}" -Value "Error al actualizar: $app"
           }
         }
 
-    - name: Detectar y actualizar aplicaciones adicionales soportadas por Winget
-      ansible.windows.win_shell: |
-        $apps = winget upgrade
-        foreach ($line in $apps) {
-          if ($line -match "^\S+") {
-            $pkg = $line.Split()[0]
-            winget upgrade --id $pkg --silent --accept-source-agreements --accept-package-agreements
-            Add-Content -Path "{{ report_file }}" -Value "Aplicación adicional actualizada: $pkg"
-          }
-        }
   rescue:
     - name: Registrar error en reporte
       ansible.windows.win_shell: |
         Add-Content -Path "{{ report_file }}" -Value "Error en Winget Updates"
+
   always:
     - name: Confirmar finalización de rol Winget Updates
       ansible.windows.win_shell: |

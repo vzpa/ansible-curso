@@ -1,7 +1,6 @@
 ---
 - name: Obtener informacion del disco C
   hosts: windows
-  gather_facts: no
 
   tasks:
     - name: Obtener facts del sistema

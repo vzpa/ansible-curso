@@ -5,7 +5,7 @@
   gather_facts: yes
 
   vars_files:
-    - ../vars/main.yml
+    - /vars/main.yml
 
   tasks:
     - name: Fase 1 - Auditoría de cumplimiento

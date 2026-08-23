@@ -10,10 +10,11 @@
         $components = @({{ ms_components | map('regex_replace', '^(.*)$', '"\1"') | join(', ') }})
         foreach ($comp in $components) {
           winget upgrade --id $comp --exact --silent --accept-source-agreements --accept-package-agreements
-          if ($LASTEXITCODE -eq 0) {
-            Add-Content -Path "{{ report_file }}" -Value "Componente actualizado: $comp"
-          } else {
-            Add-Content -Path "{{ report_file }}" -Value "Error al actualizar componente: $comp (exit $LASTEXITCODE)"
+          switch ($LASTEXITCODE) {
+            0 { Add-Content -Path "{{ report_file }}" -Value "Componente actualizado: $comp" }
+            -1978335189 { Add-Content -Path "{{ report_file }}" -Value "Componente ya estaba actualizado: $comp" }
+            -1978335212 { Add-Content -Path "{{ report_file }}" -Value "Componente no encontrado en winget: $comp (revisar ID)" }
+            default { Add-Content -Path "{{ report_file }}" -Value "Error al actualizar componente: $comp (exit $LASTEXITCODE)" }
           }
         }
       async: 1800
@@ -21,18 +22,10 @@
 
     - name: Actualizar aplicaciones de Microsoft Store
       ansible.windows.win_shell: |
-        try {
-          Get-AppxPackage -AllUsers | ForEach-Object {
-            try {
-              winget upgrade --id $_.Name --silent --accept-source-agreements --accept-package-agreements
-              Add-Content -Path "{{ report_file }}" -Value "Store app actualizada: $($_.Name)"
-            } catch {
-              Add-Content -Path "{{ report_file }}" -Value "Error al actualizar Store app: $($_.Name)"
-            }
-          }
-        } catch {
-          Add-Content -Path "{{ report_file }}" -Value "Error general en Microsoft Store updates"
-        }
+        winget upgrade --all --source msstore --silent --accept-source-agreements --accept-package-agreements
+        Add-Content -Path "{{ report_file }}" -Value "Actualización de Microsoft Store completada (exit $LASTEXITCODE)"
+      async: 900
+      poll: 15
   rescue:
     - name: Registrar error en reporte
       ansible.windows.win_shell: |

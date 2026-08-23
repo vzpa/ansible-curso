@@ -7,15 +7,17 @@
 
     - name: Actualizar componentes Microsoft definidos en vars.yaml
       ansible.windows.win_shell: |
-        $components = {{ ms_components | to_json }}
+        $components = @({{ ms_components | map('regex_replace', '^(.*)$', '"\1"') | join(', ') }})
         foreach ($comp in $components) {
-          try {
-            winget upgrade --id $comp --silent --accept-source-agreements --accept-package-agreements
+          winget upgrade --id $comp --exact --silent --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -eq 0) {
             Add-Content -Path "{{ report_file }}" -Value "Componente actualizado: $comp"
-          } catch {
-            Add-Content -Path "{{ report_file }}" -Value "Error al actualizar componente: $comp"
+          } else {
+            Add-Content -Path "{{ report_file }}" -Value "Error al actualizar componente: $comp (exit $LASTEXITCODE)"
           }
         }
+      async: 900
+      poll: 15
 
     - name: Actualizar aplicaciones de Microsoft Store
       ansible.windows.win_shell: |

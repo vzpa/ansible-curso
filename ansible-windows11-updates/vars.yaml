@@ -31,13 +31,12 @@ winget_apps:
   - Npcap
 
 ms_components:
-  - Copilot
-  - Microsoft WebView2 Runtime
-  - Microsoft .NET Framework
-  - Microsoft Visual C++ Redistributables
-  - Microsoft Teams
-  - OneDrive
-  - OneNote
-  - Office / Microsoft 365
-  - PowerShell
-  - WindowsAppRuntime
+  - Microsoft.Copilot
+  - Microsoft.EdgeWebView2Runtime
+  - Microsoft.VCRedist.2015+.x64
+  - Microsoft.Teams
+  - Microsoft.OneDrive
+  - Microsoft.OneNote
+  - Microsoft.Office
+  - Microsoft.PowerShell
+  - Microsoft.WindowsAppRuntime.1.7

@@ -17,11 +17,31 @@
         }
       async: 1800
       poll: 15
+    - name: Cerrar procesos de Epic Games Launcher y LM Studio antes de actualizar
+      ansible.windows.win_shell: |
+        Get-Process -Name "EpicGamesLauncher","EpicWebHelper","UnrealEngineLauncher","LM Studio","LMStudio" -ErrorAction SilentlyContinue | Stop-Process -Force
+        Start-Sleep -Seconds 3
 
+    - name: Actualizar Epic Games Launcher y LM Studio individualmente
+      ansible.windows.win_shell: |
+        $apps = @("EpicGames.EpicGamesLauncher", "ElementLabs.LMStudio")
+        foreach ($app in $apps) {
+          winget upgrade --id $app --exact --silent --source winget --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -eq 0) {
+            Add-Content -Path "{{ report_file }}" -Value "Aplicación actualizada: $app"
+          } else {
+            Add-Content -Path "{{ report_file }}" -Value "Error al actualizar $app (exit $LASTEXITCODE)"
+          }
+        }
+      async: 600
+      poll: 15
   rescue:
     - name: Registrar error en reporte
       ansible.windows.win_shell: |
         Add-Content -Path "{{ report_file }}" -Value "Error en Winget Updates"
+    - name: Registrar error en actualización de apps con proceso bloqueante
+      ansible.windows.win_shell: |
+        Add-Content -Path "{{ report_file }}" -Value "Error al actualizar Epic Games Launcher / LM Studio"
 
   always:
     - name: Confirmar finalización de rol Winget Updates

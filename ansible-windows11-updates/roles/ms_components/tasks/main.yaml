@@ -16,7 +16,7 @@
             Add-Content -Path "{{ report_file }}" -Value "Error al actualizar componente: $comp (exit $LASTEXITCODE)"
           }
         }
-      async: 900
+      async: 1800
       poll: 15
 
     - name: Actualizar aplicaciones de Microsoft Store

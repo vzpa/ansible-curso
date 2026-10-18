@@ -13,6 +13,11 @@
         src: recursos/prueba1.txt
         dest: C:\temp\pruebaansible\prueba1.txt
 
+    - name: Crear archivo en C:\temp\ si no existe
+      win_file:
+        path: C:\temp\prueba.txt
+        state: touch
+
     - name: Mover fichero dentro de Windows
       win_copy:
         src: C:\temp\prueba.txt

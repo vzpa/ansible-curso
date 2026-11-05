@@ -1,36 +1,198 @@
-- block:
-    - name: Crear carpeta de logs si no existe
-      ansible.windows.win_shell: |
-        if (-Not (Test-Path "{{ log_path }}")) {
-          New-Item -ItemType Directory -Path "{{ log_path }}"
-        }
+---
+# roles/ms_components/tasks/main.yaml
+#
+# Evalúa (y opcionalmente actualiza) componentes Microsoft por ID EXACTO de WinGet.
+#
+# Garantías de diseño:
+#   - Por defecto solo CONSULTA (ms_components_mode: check). No instala nada.
+#   - Nunca usa `winget upgrade --all`.
+#   - No cierra procesos.
+#   - Cada ID se evalúa por separado, con su propio timeout.
+#   - Se conserva rc, stdout y stderr crudos de cada invocación a winget.
+#   - El estado NO se infiere de texto localizado: se usa el rc como pista y,
+#     en modo upgrade, una verificación posterior independiente.
+#   - Scripts compatibles con Windows PowerShell 5.1.
+#
+# Salida (variables para el rol `reporting`):
+#   ms_components_results  -> lista con el detalle por ID
+#   ms_components_summary  -> resumen (modo, total, problemas, estado)
 
-    - name: Actualizar componentes Microsoft definidos en vars.yaml
-      ansible.windows.win_shell: |
-        $components = @({{ ms_components | map('regex_replace', '^(.*)$', '"\1"') | join(', ') }})
-        foreach ($comp in $components) {
-          winget upgrade --id $comp --exact --silent --accept-source-agreements --accept-package-agreements
-          switch ($LASTEXITCODE) {
-            0 { Add-Content -Path "{{ report_file }}" -Value "Componente actualizado: $comp" }
-            -1978335189 { Add-Content -Path "{{ report_file }}" -Value "Componente ya estaba actualizado: $comp" }
-            -1978335212 { Add-Content -Path "{{ report_file }}" -Value "Componente no encontrado en winget: $comp (revisar ID)" }
-            default { Add-Content -Path "{{ report_file }}" -Value "Error al actualizar componente: $comp (exit $LASTEXITCODE)" }
+- name: ms_components | Validar entrada y confirmación
+  ansible.builtin.assert:
+    that:
+      - ms_components_mode in ['check', 'upgrade']
+      - ms_components_ids is sequence
+      - ms_components_ids is not string
+      - ms_components_timeout_seconds | int > 0
+      - ms_components_mode == 'check' or (update_manager_confirm | default('')) == 'INSTALL'
+      - ms_components_mode == 'check' or not (ansible_check_mode | default(false))
+    fail_msg: >-
+      Entrada inválida. Revisa: ms_components_mode (check|upgrade),
+      ms_components_ids (lista), ms_components_timeout_seconds (> 0).
+      El modo 'upgrade' exige update_manager_confirm: INSTALL y no admite --check.
+    success_msg: "Entrada válida. Modo: {{ ms_components_mode }}"
+    quiet: false
+
+- name: ms_components | Evaluar cada ID de WinGet
+  ansible.windows.win_powershell:
+    parameters:
+      PackageId: "{{ item }}"
+      Mode: "{{ ms_components_mode }}"
+      TimeoutSeconds: "{{ ms_components_timeout_seconds | int }}"
+    script: |
+      param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Mode,
+        [int]$TimeoutSeconds = 600
+      )
+      $ErrorActionPreference = 'Stop'
+
+      # Por defecto win_powershell marca changed=true; se ajusta explícitamente más abajo.
+      $Ansible.Changed = $false
+
+      # Códigos HRESULT de WinGet usados SOLO como pista (validar en el host real):
+      #   -1978335212 (0x8A150014) = sin coincidencias
+      #   -1978335189 (0x8A15002B) = sin actualización aplicable
+      $RC_NO_MATCH  = -1978335212
+      $RC_NO_UPDATE = -1978335189
+
+      function Find-Winget {
+        $cmd = Get-Command winget.exe -ErrorAction SilentlyContinue
+        if ($cmd) { return $cmd.Source }
+        # Alias MSIX no está en PATH en sesiones no interactivas; requiere privilegios de admin.
+        $c = Get-ChildItem "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue |
+             Sort-Object FullName -Descending | Select-Object -First 1
+        if ($c) { return $c.FullName }
+        return $null
+      }
+
+      function Invoke-Winget {
+        param([string]$Exe, [string[]]$WgArgs, [int]$Timeout)
+        $o = [IO.Path]::GetTempFileName()
+        $e = [IO.Path]::GetTempFileName()
+        try {
+          $p = Start-Process -FilePath $Exe -ArgumentList $WgArgs -NoNewWindow -PassThru `
+                 -RedirectStandardOutput $o -RedirectStandardError $e
+          $null = $p.Handle   # necesario en PS 5.1 para poder leer ExitCode
+          $timedOut = -not $p.WaitForExit($Timeout * 1000)
+          if ($timedOut) { try { $p.Kill() } catch { } }
+          [pscustomobject]@{
+            args      = ($WgArgs -join ' ')
+            rc        = $(if ($timedOut) { $null } else { $p.ExitCode })
+            timed_out = $timedOut
+            stdout    = [IO.File]::ReadAllText($o, [Text.Encoding]::UTF8)
+            stderr    = [IO.File]::ReadAllText($e, [Text.Encoding]::UTF8)
+          }
+        } finally {
+          Remove-Item -LiteralPath $o, $e -Force -ErrorAction SilentlyContinue
+        }
+      }
+
+      $res = [ordered]@{
+        id             = $PackageId
+        mode           = $Mode
+        winget_path    = $null
+        classification = 'script_error'
+        error          = $null
+      }
+
+      try {
+        $wg = Find-Winget
+        $res.winget_path = $wg
+        if (-not $wg) {
+          $res.classification = 'winget_not_found'
+        } else {
+          $common = @('--id', $PackageId, '--exact', '--source', 'winget', '--accept-source-agreements')
+
+          # 1) Estado actual (¿está instalado con ese ID?) y 2) ¿hay actualización?
+          $res.before = Invoke-Winget $wg (@('list') + $common) $TimeoutSeconds
+          $res.check  = Invoke-Winget $wg (@('list', '--upgrade-available') + $common) $TimeoutSeconds
+
+          if ($res.before.timed_out -or $res.check.timed_out) {
+            $res.classification = 'timeout'
+          } elseif ($res.before.rc -eq $RC_NO_MATCH) {
+            $res.classification = 'not_installed'
+          } elseif ($res.before.rc -ne 0) {
+            $res.classification = 'other_rc'
+          } elseif ($res.check.rc -eq $RC_NO_MATCH) {
+            $res.classification = 'up_to_date'
+          } elseif ($res.check.rc -ne 0) {
+            $res.classification = 'other_rc'
+          } else {
+            $res.classification = 'update_available'
+          }
+
+          # 3) Solo en modo upgrade y solo si hay actualización disponible para ESTE id.
+          if ($Mode -eq 'upgrade' -and $res.classification -eq 'update_available') {
+            $res.upgrade = Invoke-Winget $wg (@('upgrade') + $common + @('--silent', '--disable-interactivity', '--accept-package-agreements')) $TimeoutSeconds
+            if ($res.upgrade.timed_out) {
+              $res.classification = 'timeout'
+            } else {
+              # Verificación posterior independiente (no depende del texto de winget).
+              $res.after      = Invoke-Winget $wg (@('list') + $common) $TimeoutSeconds
+              $res.post_check = Invoke-Winget $wg (@('list', '--upgrade-available') + $common) $TimeoutSeconds
+              if ($res.upgrade.rc -eq 0 -and $res.post_check.rc -eq $RC_NO_MATCH) {
+                $res.classification = 'upgraded'
+                $Ansible.Changed = $true
+              } elseif ($res.upgrade.rc -eq 0 -and $res.post_check.rc -eq 0) {
+                $res.classification = 'still_outdated'
+              } elseif ($res.upgrade.rc -eq 0) {
+                $res.classification = 'upgrade_unverified'
+              } elseif ($res.upgrade.rc -eq $RC_NO_UPDATE) {
+                $res.classification = 'up_to_date'
+              } else {
+                $res.classification = 'other_rc'
+              }
+            }
           }
         }
-      async: 1800
-      poll: 15
+      } catch {
+        $res.classification = 'script_error'
+        $res.error = $_.Exception.Message
+      }
 
-    - name: Actualizar aplicaciones de Microsoft Store
-      ansible.windows.win_shell: |
-        winget upgrade --all --source msstore --silent --accept-source-agreements --accept-package-agreements
-        Add-Content -Path "{{ report_file }}" -Value "Actualización de Microsoft Store completada (exit $LASTEXITCODE)"
-      async: 900
-      poll: 15
-  rescue:
-    - name: Registrar error en reporte
-      ansible.windows.win_shell: |
-        Add-Content -Path "{{ report_file }}" -Value "Error en rol Microsoft Components"
-  always:
-    - name: Confirmar finalización de rol Microsoft Components
-      ansible.windows.win_shell: |
-        Add-Content -Path "{{ report_file }}" -Value "Finalizó rol Microsoft Components"
+      $Ansible.Result = $res
+  loop: "{{ ms_components_ids }}"
+  loop_control:
+    label: "{{ item }}"
+  register: ms_components_raw
+  failed_when: false
+
+- name: ms_components | Consolidar resultados estructurados
+  ansible.builtin.set_fact:
+    ms_components_results: >-
+      {{ ms_components_raw.results
+         | map(attribute='result', default={'classification': 'script_error'})
+         | list }}
+
+- name: ms_components | Construir resumen
+  vars:
+    _classes: >-
+      {{ ms_components_results
+         | map(attribute='classification', default='script_error')
+         | list }}
+    _pairs: "{{ ms_components_ids | zip(_classes) | list }}"
+    _problems: >-
+      {{ _pairs
+         | selectattr('1', 'in', ms_components_problem_classes)
+         | map(attribute='0')
+         | list }}
+  ansible.builtin.set_fact:
+    ms_components_summary:
+      mode: "{{ ms_components_mode }}"
+      total: "{{ ms_components_ids | length | int }}"
+      update_available: "{{ _pairs | selectattr('1', 'equalto', 'update_available') | map(attribute='0') | list }}"
+      upgraded: "{{ _pairs | selectattr('1', 'equalto', 'upgraded') | map(attribute='0') | list }}"
+      problems: "{{ _problems }}"
+      status: "{{ 'ok' if (_problems | length) == 0 else 'partial' }}"
+
+- name: ms_components | Mostrar resumen
+  ansible.builtin.debug:
+    var: ms_components_summary
+
+- name: ms_components | Fallar si hay problemas y se exige
+  ansible.builtin.fail:
+    msg: "Componentes con problemas: {{ ms_components_summary.problems }}"
+  when:
+    - ms_components_fail_on_error | bool
+    - ms_components_summary.problems | length > 0

@@ -1,0 +1,39 @@
+---
+# roles/reporting/defaults/main.yaml
+#
+# Contrato con los demás roles: cada fase publica DOS variables (set_fact):
+#   <fase>_summary -> dict con al menos: status (ok|partial|failed), y
+#                     opcionalmente mode, total, problems (lista de ids)
+#   <fase>_results -> lista de dicts con al menos: id, classification
+#                     (opcionales: before/check/upgrade/after/post_check con 'rc',
+#                      y 'error')
+# Una fase sin <fase>_summary se considera 'not_run' (no se ejecutó o abortó antes).
+
+# Fases que el informe sabe consolidar. 'critical: true' significa que si la fase
+# falla, el resultado global NUNCA puede ser 'correcto' (será 'fallido').
+reporting_phases:
+  - name: preflight
+    critical: true
+  - name: windows_updates
+    critical: true
+  - name: application_updates
+    critical: false
+  - name: ms_components
+    critical: false
+
+# Fases que el playbook EXIGE haber ejecutado. Si falta alguna, el resultado
+# global es 'fallido' (p. ej. el rol abortó antes de publicar su resumen).
+# Cada playbook debería fijar esta lista, p. ej. ['preflight', 'ms_components'].
+reporting_required_phases: []
+
+# Si es true, se incluye stdout/stderr crudo de cada paso en el artefacto de AWX.
+# Por defecto false: el artefacto solo lleva clasificación y rc por elemento
+# (la salida completa queda en el log del job). No contiene secretos, pero es voluminosa.
+reporting_include_raw_output: false
+
+# Si es true, el job termina en 'failed' cuando el resultado global es 'fallido'
+# (el artefacto se publica ANTES de fallar, así que no se pierde).
+reporting_fail_job_on_failed: true
+
+# Prefijo del artefacto en AWX. Se publica como <prefijo>_<host_saneado>.
+reporting_stats_prefix: update_manager_report

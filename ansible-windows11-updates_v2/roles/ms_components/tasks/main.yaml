@@ -1,0 +1,40 @@
+---
+# roles/ms_components/tasks/main.yaml
+#
+# Componentes Microsoft gestionados por WinGet. Este rol YA NO contiene lógica propia:
+# es una lista de IDs (defaults/main.yaml) que se evalúa con el motor WinGet del rol
+# `application_updates` (tasks/engine.yaml y files/Invoke-WingetPackage.ps1). Así hay un solo código
+# que mantener y las mismas garantías:
+#   - por defecto solo CONSULTA; 'upgrade' exige update_manager_confirm: INSTALL
+#   - IDs exactos, nunca `--all`; no cierra procesos (forzado a false aquí)
+#   - rc/stdout/stderr por paso y verificación posterior
+#
+# Publica (contrato de `reporting`):
+#   ms_components_results -> lista por ID
+#   ms_components_summary -> dict {mode, status (ok|partial|failed), total, problems, ...}
+
+- name: ms_components | Validar modo
+  ansible.builtin.assert:
+    that:
+      - ms_components_mode in ['check', 'upgrade']
+    fail_msg: "ms_components_mode debe ser 'check' o 'upgrade'."
+    quiet: true
+
+- name: ms_components | Evaluar componentes con el motor WinGet
+  ansible.builtin.include_role:
+    name: application_updates
+    tasks_from: engine
+  vars:
+    winget_engine_mode: "{{ ms_components_mode }}"
+    winget_engine_apps: "{{ ms_components_ids }}"
+    winget_engine_limit_ids: "{{ ms_components_limit_ids }}"
+    winget_engine_default_source: winget
+    winget_engine_timeout_seconds: "{{ ms_components_timeout_seconds }}"
+    winget_engine_close_processes: false
+    winget_engine_force_close: false
+    winget_engine_grace_seconds: 20
+    winget_engine_fail_on_error: "{{ ms_components_fail_on_error }}"
+    winget_engine_problem_classes: "{{ ms_components_problem_classes }}"
+    winget_engine_failure_classes: "{{ ms_components_engine_failure_classes }}"
+    winget_engine_result_prefix: ms_components
+    winget_engine_log_directory: "{{ ms_components_log_directory | default('C:/Logs/ansible_updates/winget', true) }}"

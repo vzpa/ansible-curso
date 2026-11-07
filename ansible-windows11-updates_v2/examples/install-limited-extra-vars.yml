@@ -1,0 +1,14 @@
+---
+# Ejemplo controlado: habilita la instalación solo después de revisar check_updates.yaml.
+update_manager_confirm: INSTALL
+update_manager_hosts: windows
+update_manager_run_windows_updates: false
+update_manager_run_application_updates: true
+update_manager_run_ms_components: false
+application_updates_limit_ids:
+  - 7zip.7zip
+windows_updates_reboot: false
+application_updates_close_processes: false
+application_updates_force_close: false
+reporting_write_files: true
+reporting_fail_job_on_partial: true

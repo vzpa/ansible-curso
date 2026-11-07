@@ -1,0 +1,74 @@
+---
+# roles/ms_components/defaults/main.yaml
+#
+# Valores por defecto del rol ms_components.
+# Seguridad: el modo por defecto es 'check' (solo consulta, no instala nada).
+# La lógica vive en el rol `application_updates`; aquí solo se define QUÉ componentes
+# Microsoft se evalúan. Cada entrada puede ser un ID (cadena) o, si hace falta, un
+# diccionario { id: ..., source: winget|msstore }.
+
+# 'check'   -> consulta (winget list / list --upgrade-available). No instala.
+# 'upgrade' -> actualiza SOLO los IDs de la lista que tengan actualización
+#              disponible. Exige update_manager_confirm: INSTALL.
+ms_components_mode: check
+
+# IDs exactos de WinGet. Verificados contra `winget list` del equipo (2026-11-05).
+# Excluidos a propósito (no son gestionables con ese ID en este equipo):
+#   - Microsoft.Copilot          -> no aparece con ID de winget (solo ARP/MSIX)
+#   - Microsoft.Office           -> es Office Deployment Tool; tu Microsoft 365
+#                                   es Click-to-Run y se actualiza por su cuenta
+#   - Microsoft.OneNote          -> instalación ARP sin ID de winget
+#   - Microsoft.EdgeWebView2Runtime -> no aparece instalado en `winget list`
+# Candidatos detectados en tu `winget list` (NO activados; añádelos tú si los quieres):
+#   Microsoft.WindowsTerminal        (1.24 -> 1.25 disponible)
+#   Microsoft.365Copilot             (actualización disponible)
+#   Microsoft.Outlook
+#   Microsoft.DotNet.Runtime.8 / Microsoft.DotNet.AspNetCore.8 /
+#   Microsoft.DotNet.DesktopRuntime.8 / Microsoft.DotNet.SDK.10
+#   Microsoft.WindowsInstallationAssistant
+# Nota: Microsoft.WindowsAppRuntime.1.7 aparece 3 veces en tu equipo (1.7.9 x2 y 1.7.6);
+# con duplicados `--exact` puede ser ambiguo. Revisa su resultado en la primera consulta.
+ms_components_ids:
+  - Microsoft.Edge
+  - Microsoft.OneDrive
+  - Microsoft.Teams
+  - Microsoft.PowerShell
+  - Microsoft.VCRedist.2015+.x64
+  - Microsoft.WindowsAppRuntime.1.7
+
+# Limita la ejecución a estos IDs (subconjunto de ms_components_ids). Vacío = todos.
+ms_components_limit_ids: []
+
+# Tiempo máximo (segundos) por cada invocación de winget.
+ms_components_timeout_seconds: 600
+
+# Logs por componente Microsoft en el host Windows.
+ms_components_log_directory: 'C:\Logs\ansible_updates\winget'
+
+# Si es true, el rol falla al terminar cuando algún ID quedó en
+# ms_components_problem_classes. Si es false, solo lo reporta (estado 'partial').
+ms_components_fail_on_error: false
+
+# Clasificaciones (derivadas del código de salida; son pistas, no verdad absoluta)
+# que se consideran "problema" en el resumen.
+ms_components_problem_classes:
+  - winget_not_found
+  - script_error
+  - log_write_failed
+  - not_installed
+  - timeout
+  - other_rc
+  - still_outdated
+  - upgrade_unverified
+  - blocked_by_process
+
+# Clasificaciones que indican fallo del motor (estado 'failed' en vez de 'partial').
+ms_components_engine_failure_classes:
+  - winget_not_found
+  - script_error
+  - log_write_failed
+  - timeout
+  - other_rc
+  - still_outdated
+  - upgrade_unverified
+  - blocked_by_process

@@ -1,0 +1,88 @@
+---
+# check_updates.yml
+#
+# CONSULTA de actualizaciones de Windows 11. No descarga, no instala y no reinicia.
+# Es el flujo inicial obligatorio: ejecútalo y revisa el informe antes de usar
+# update_windows11.yml.
+#
+# Fases (cada una se puede desactivar con su variable; por defecto todas activas):
+#   update_manager_run_windows_updates       Windows Update (win_updates, state: searched)
+#   update_manager_run_application_updates   Aplicaciones por ID exacto de WinGet
+#   update_manager_run_ms_components         Componentes Microsoft por ID exacto de WinGet
+#
+# Variables opcionales para encuesta/extra vars de AWX (todas tienen valor por defecto):
+#   update_manager_hosts               Grupo/host destino (defecto: windows)
+#   application_updates_limit_ids      Limitar WinGet a estos IDs
+#   ms_components_limit_ids            Limitar componentes Microsoft a estos IDs
+#   windows_updates_extra_categories   Categorías adicionales de Windows Update
+#
+# Evidencia que produce: informe `update_manager_report_<host>` en los artefactos del
+# job (set_stats) con el resultado global (correcto | parcial | fallido), el estado por
+# fase y el rc/clasificación por elemento. Si el resultado global es 'fallido', el job
+# termina como failed DESPUÉS de publicar el informe.
+#
+# Ubicación: este archivo está junto a la carpeta roles/ a propósito. Sin ansible.cfg,
+# Ansible solo busca roles en <carpeta del playbook>/roles.
+#
+# Validar sintaxis (sin conectar a Windows):
+#   ansible-playbook --syntax-check -i localhost, check_updates.yml
+
+- name: Consultar actualizaciones de Windows 11 (sin instalar ni reiniciar)
+  hosts: "{{ update_manager_hosts | default('windows') }}"
+  gather_facts: false
+
+  vars:
+    # El informe exige haber ejecutado las fases activas: si un rol aborta antes de
+    # publicar su resumen, el resultado global es 'fallido' y no 'correcto'.
+    reporting_required_phases: >-
+      {{ (['windows_updates'] if (update_manager_run_windows_updates | default(true) | bool) else [])
+         + (['application_updates'] if (update_manager_run_application_updates | default(true) | bool) else [])
+         + (['ms_components'] if (update_manager_run_ms_components | default(true) | bool) else []) }}
+
+  pre_tasks:
+    - name: Garantizar que este playbook es solo de consulta
+      ansible.builtin.assert:
+        that:
+          - (windows_updates_mode | default('check')) == 'check'
+          - (application_updates_mode | default('check')) == 'check'
+          - (ms_components_mode | default('check')) == 'check'
+          - not (windows_updates_reboot | default(false) | bool)
+        fail_msg: >-
+          check_updates.yml es solo de consulta: no admite modos de instalación ni reinicio.
+          Para instalar usa update_windows11.yml con update_manager_confirm: INSTALL.
+        quiet: true
+
+  tasks:
+    - name: Consulta por fases
+      block:
+        - name: Windows Update (solo búsqueda)
+          ansible.builtin.include_role:
+            name: windows_updates
+          vars:
+            windows_updates_mode: check
+          when: update_manager_run_windows_updates | default(true) | bool
+
+        - name: Aplicaciones WinGet (solo consulta)
+          ansible.builtin.include_role:
+            name: application_updates
+          vars:
+            application_updates_mode: check
+          when: update_manager_run_application_updates | default(true) | bool
+
+        - name: Componentes Microsoft (solo consulta)
+          ansible.builtin.include_role:
+            name: ms_components
+          vars:
+            ms_components_mode: check
+          when: update_manager_run_ms_components | default(true) | bool
+
+      rescue:
+        - name: Registrar la tarea que falló (para el informe)
+          ansible.builtin.set_fact:
+            update_manager_failure: "{{ ansible_failed_task.name | default('desconocida') }}"
+            update_manager_failure_detail: "{{ ansible_failed_result.msg | default('') }}"
+
+      always:
+        - name: Publicar informe
+          ansible.builtin.include_role:
+            name: reporting

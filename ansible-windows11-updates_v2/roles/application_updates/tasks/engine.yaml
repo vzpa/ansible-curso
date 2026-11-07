@@ -1,0 +1,179 @@
+---
+# roles/application_updates/tasks/engine.yaml
+#
+# MOTOR INTERNO de WinGet. No se invoca directamente desde un playbook: lo usan los
+# roles `application_updates` (tasks/main.yaml) y `ms_components`, que le pasan sus
+# entradas mediante las variables winget_engine_*.
+#
+# Por qué un espacio de nombres propio: las extra vars de AWX tienen prioridad sobre
+# las variables que un rol pasa a otro. Si el motor leyera application_updates_* o
+# ms_components_*, una encuesta que limite las apps (application_updates_limit_ids)
+# o cambie su modo se colaría en la otra fase. Con winget_engine_* ninguna variable
+# de cara al usuario se comparte entre fases. NO definas winget_engine_* en AWX.
+#
+# Consulta (por defecto) o actualiza aplicaciones por ID EXACTO de WinGet, una a una,
+# con timeout propio por invocación y evidencia (rc/stdout/stderr) por paso.
+# El script vive en files/Invoke-WingetPackage.ps1 (compatible con PowerShell 5.1).
+#
+# Entradas obligatorias (las pasa quien llama):
+#   winget_engine_mode, _apps, _limit_ids, _default_source, _timeout_seconds,
+#   _close_processes, _force_close, _grace_seconds, _fail_on_error,
+#   _problem_classes, _failure_classes, _result_prefix
+#
+# Publica (con el prefijo winget_engine_result_prefix):
+#   <prefijo>_results -> lista de dicts por app (contrato de `reporting`)
+#   <prefijo>_summary -> dict {mode, status (ok|partial|failed), total, problems, ...}
+
+- name: winget_engine | Verificar que quien llama pasó todas las entradas
+  ansible.builtin.assert:
+    that:
+      - winget_engine_mode is defined
+      - winget_engine_apps is defined
+      - winget_engine_limit_ids is defined
+      - winget_engine_default_source is defined
+      - winget_engine_timeout_seconds is defined
+      - winget_engine_close_processes is defined
+      - winget_engine_force_close is defined
+      - winget_engine_grace_seconds is defined
+      - winget_engine_fail_on_error is defined
+      - winget_engine_problem_classes is defined
+      - winget_engine_failure_classes is defined
+      - winget_engine_result_prefix is defined
+      - winget_engine_log_directory is defined
+    fail_msg: "El motor winget_engine no es un punto de entrada: use el rol application_updates o ms_components."
+    quiet: true
+
+- name: winget_engine | Validar entrada y confirmación
+  ansible.builtin.assert:
+    that:
+      - winget_engine_mode in ['check', 'upgrade']
+      - winget_engine_apps is sequence and winget_engine_apps is not string
+      - winget_engine_limit_ids is sequence and winget_engine_limit_ids is not string
+      - winget_engine_default_source in ['winget', 'msstore']
+      - winget_engine_timeout_seconds | int > 0
+      - winget_engine_mode == 'check' or (update_manager_confirm | default('')) == 'INSTALL'
+      - winget_engine_mode == 'check' or not (ansible_check_mode | default(false))
+      - not (winget_engine_close_processes | bool) or winget_engine_mode == 'upgrade'
+      - not (winget_engine_force_close | bool) or (winget_engine_close_processes | bool)
+    fail_msg: >-
+      Entrada inválida. Reglas: modo check|upgrade; 'upgrade' exige update_manager_confirm:
+      INSTALL y no admite --check; el cierre de procesos solo con modo upgrade; el cierre
+      forzado exige activar antes el cierre de procesos.
+    success_msg: "Entrada válida. Modo: {{ winget_engine_mode }}"
+    quiet: false
+
+- name: winget_engine | Normalizar lista de aplicaciones
+  ansible.builtin.set_fact:
+    winget_engine_all_apps: >-
+      {%- set ns = namespace(rows=[]) -%}
+      {%- for a in winget_engine_apps -%}
+        {%- set ns.rows = ns.rows + [ {
+              'id': ((a.id if (a is mapping) else a) | string | trim),
+              'source': ((a.source | default(winget_engine_default_source)) if (a is mapping)
+                         else winget_engine_default_source),
+              'stop_processes': ((a.stop_processes | default([])) if (a is mapping) else [])
+            } ] -%}
+      {%- endfor -%}
+      {{ ns.rows }}
+
+- name: winget_engine | Calcular alcance efectivo
+  ansible.builtin.set_fact:
+    winget_engine_effective_apps: >-
+      {{ (winget_engine_all_apps | selectattr('id', 'in', winget_engine_limit_ids) | list)
+         if (winget_engine_limit_ids | length) > 0 else winget_engine_all_apps }}
+
+- name: winget_engine | Validar la lista de aplicaciones
+  vars:
+    _all_ids: "{{ winget_engine_all_apps | map(attribute='id') | list }}"
+  ansible.builtin.assert:
+    that:
+      - _all_ids | length > 0
+      - (_all_ids | select('equalto', '') | list | length) == 0
+      - (_all_ids | length) == (_all_ids | unique | length)
+      - not ('*' in _all_ids)
+      - (winget_engine_all_apps | map(attribute='source') | difference(['winget', 'msstore']) | length) == 0
+      - (winget_engine_limit_ids | difference(_all_ids) | length) == 0
+      - winget_engine_effective_apps | length > 0
+    fail_msg: >-
+      Lista de aplicaciones inválida: debe tener al menos una entrada, sin IDs vacíos,
+      duplicados ni comodines; las fuentes deben ser winget|msstore y
+      winget_engine_limit_ids solo puede contener IDs presentes en la lista.
+    quiet: true
+
+- name: winget_engine | Mostrar alcance efectivo
+  ansible.builtin.debug:
+    msg:
+      - "Modo: {{ winget_engine_mode }}"
+      - "Aplicaciones ({{ winget_engine_effective_apps | length }}): {{ winget_engine_effective_apps | map(attribute='id') | join(', ') }}"
+      - "Cierre de procesos: {{ winget_engine_close_processes | bool }} | Forzado: {{ winget_engine_force_close | bool }}"
+      - "Timeout por invocación: {{ winget_engine_timeout_seconds }} s"
+
+- name: winget_engine | Evaluar cada aplicación
+  ansible.windows.win_powershell:
+    script: "{{ lookup('ansible.builtin.file', 'Invoke-WingetPackage.ps1') }}"
+    parameters:
+      PackageId: "{{ item.id }}"
+      Source: "{{ item.source }}"
+      Mode: "{{ winget_engine_mode }}"
+      TimeoutSeconds: "{{ winget_engine_timeout_seconds | int }}"
+      ProcessNames: "{{ item.stop_processes }}"
+      CloseProcesses: "{{ winget_engine_close_processes | bool }}"
+      ForceClose: "{{ winget_engine_force_close | bool }}"
+      GraceSeconds: "{{ winget_engine_grace_seconds | int }}"
+      LogDirectory: "{{ winget_engine_log_directory }}\\{{ winget_engine_result_prefix }}"
+    depth: 4
+  loop: "{{ winget_engine_effective_apps }}"
+  loop_control:
+    label: "{{ item.id }}"
+  register: winget_engine_raw
+  failed_when: false
+
+- name: winget_engine | Consolidar resultados y resumen
+  vars:
+    # Siempre conserva el id de la app (del bucle) y, si el módulo cayó sin devolver
+    # resultado, el mensaje de error del módulo.
+    _results: >-
+      {%- set ns = namespace(rows=[]) -%}
+      {%- for r in winget_engine_raw.results -%}
+        {%- set base = r.result | default({'classification': 'script_error',
+                                           'error': (r.msg | default('el módulo no devolvió resultado'))}) -%}
+        {%- set ns.rows = ns.rows + [ {'id': ((r.item | default({})).id | default('?'))} | combine(base) ] -%}
+      {%- endfor -%}
+      {{ ns.rows }}
+    _classes: "{{ _results | map(attribute='classification', default='script_error') | list }}"
+    _ids: "{{ winget_engine_effective_apps | map(attribute='id') | list }}"
+    _pairs: "{{ _ids | zip(_classes) | list }}"
+    _problems: >-
+      {{ _pairs | selectattr('1', 'in', winget_engine_problem_classes)
+         | map(attribute='0') | list }}
+    _engine_failures: >-
+      {{ _pairs | selectattr('1', 'in', winget_engine_failure_classes)
+         | map(attribute='0') | list }}
+    _status: >-
+      {{ 'failed' if (_engine_failures | length) > 0
+         else ('partial' if (_problems | length) > 0 else 'ok') }}
+  ansible.builtin.set_fact:
+    "{{ winget_engine_result_prefix }}_results": "{{ _results }}"
+    "{{ winget_engine_result_prefix }}_summary": >-
+      {{ {
+        'mode': winget_engine_mode,
+        'status': _status,
+        'total': _ids | length,
+        'update_available': _pairs | selectattr('1', 'equalto', 'update_available') | map(attribute='0') | list,
+        'updated': _pairs | selectattr('1', 'equalto', 'updated') | map(attribute='0') | list,
+        'upgraded': _pairs | selectattr('1', 'equalto', 'updated') | map(attribute='0') | list,
+        'up_to_date': _pairs | selectattr('1', 'equalto', 'up_to_date') | map(attribute='0') | list,
+        'not_installed': _pairs | selectattr('1', 'equalto', 'not_installed') | map(attribute='0') | list,
+        'problems': _problems
+      } }}
+
+- name: winget_engine | Mostrar resumen
+  ansible.builtin.debug:
+    msg: "{{ lookup('ansible.builtin.vars', winget_engine_result_prefix ~ '_summary') }}"
+
+- name: winget_engine | Fallar si hay problemas y se exige
+  ansible.builtin.fail:
+    msg: "Aplicaciones con problemas: {{ lookup('ansible.builtin.vars', winget_engine_result_prefix ~ '_summary').problems }}"
+  when:
+    - winget_engine_fail_on_error | bool
+    - (lookup('ansible.builtin.vars', winget_engine_result_prefix ~ '_summary').problems | length) > 0

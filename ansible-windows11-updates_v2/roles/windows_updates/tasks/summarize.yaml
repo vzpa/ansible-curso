@@ -1,0 +1,109 @@
+---
+# roles/windows_updates/tasks/summarize.yaml
+#
+# Lógica pura (no toca Windows): convierte los retornos de win_updates en
+#   windows_updates_results -> lista de dicts {id, classification, title, kb, categories, guid, error}
+#   windows_updates_summary -> dict {mode, status (ok|partial|failed), found, installed, ...}
+# Contrato consumido por el rol `reporting`.
+#
+# Clasificación por actualización (solo estado reportado por el módulo, no texto):
+#   update_available -> encontrada en modo check
+#   installed        -> installed=true y sin fallo
+#   failed           -> el módulo devolvió failure_hresult_code/failure_msg
+#   not_installed    -> encontrada, no instalada y sin fallo (p. ej. reinicio pendiente)
+# Estado:
+#   failed  -> búsqueda o instalación fallaron, o hay actualizaciones con fallo
+#   partial -> reinicio pendiente, quedan actualizaciones, verificación posterior fallida
+#              o hay actualizaciones sin instalar
+#   ok      -> en caso contrario (en modo check, hallazgos NO degradan el estado)
+
+- name: windows_updates | Construir resultados por actualización
+  vars:
+    _install_ran: "{{ windows_updates_install is defined and windows_updates_install is not skipped }}"
+    _src_mode: >-
+      {{ 'install' if ((_install_ran | bool) and windows_updates_install.updates is defined)
+         else ('install_failed' if (_install_ran | bool) else 'search') }}
+  ansible.builtin.set_fact:
+    windows_updates_results: >-
+      {%- set ns = namespace(rows=[]) -%}
+      {%- set src = windows_updates_install if _src_mode == 'install' else windows_updates_search -%}
+      {%- for key, u in (src.updates | default({})).items() -%}
+        {%- set has_fail = (u.failure_hresult_code is defined) or (u.failure_msg is defined) -%}
+        {%- if _src_mode == 'install' -%}
+          {%- set cls = 'failed' if has_fail else ('installed' if (u.installed | default(false)) else 'not_installed') -%}
+        {%- elif _src_mode == 'install_failed' -%}
+          {%- set cls = 'not_installed' -%}
+        {%- else -%}
+          {%- set cls = 'update_available' -%}
+        {%- endif -%}
+        {%- set kb = u.kb | default([]) -%}
+        {%- set ns.rows = ns.rows + [ {
+              'id': (('KB' ~ kb[0]) if (kb | length) > 0 else key),
+              'classification': cls,
+              'title': u.title | default(''),
+              'kb': kb,
+              'categories': u.categories | default([]),
+              'guid': key,
+              'error': (u.failure_msg | default('') if u.failure_msg is defined
+                        else (('HRESULT ' ~ u.failure_hresult_code) if u.failure_hresult_code is defined else ''))
+            } ] -%}
+      {%- endfor -%}
+      {{ ns.rows }}
+
+- name: windows_updates | Construir resumen
+  vars:
+    _install_ran: "{{ windows_updates_install is defined and windows_updates_install is not skipped }}"
+    _post_ran: "{{ windows_updates_post is defined and windows_updates_post is not skipped }}"
+    _search_failed: "{{ windows_updates_search.failed | default(false) | bool }}"
+    _install_failed: "{{ (_install_ran | bool) and (windows_updates_install.failed | default(false) | bool) }}"
+    _post_failed: "{{ (_post_ran | bool) and (windows_updates_post.failed | default(false) | bool) }}"
+    _post_ok: "{{ (_post_ran | bool) and not (_post_failed | bool) }}"
+    _failed_count: "{{ (windows_updates_install.failed_update_count | default(0) | int) if (_install_ran | bool) else 0 }}"
+    _installed_count: "{{ (windows_updates_install.installed_update_count | default(0) | int) if (_install_ran | bool) else 0 }}"
+    _not_installed: "{{ windows_updates_results | selectattr('classification', 'equalto', 'not_installed') | list | length }}"
+    _remaining: "{{ (windows_updates_post.found_update_count | default(0) | int) if (_post_ok | bool) else 0 }}"
+    _rebooted: "{{ (_install_ran | bool) and (windows_updates_install.rebooted | default(false) | bool) }}"
+    _install_reboot_pending: >-
+      {{ (_install_ran | bool) and (windows_updates_install.reboot_required | default(false) | bool)
+         and not (_rebooted | bool) }}
+    _post_reboot_required: "{{ (_post_ok | bool) and (windows_updates_post.reboot_required | default(false) | bool) }}"
+    _reboot_required: "{{ (_post_reboot_required | bool) or (_install_reboot_pending | bool) }}"
+    _problems: >-
+      {{ (['search_failed'] if (_search_failed | bool) else [])
+         + (['install_failed'] if (_install_failed | bool) else [])
+         + (['updates_failed:' ~ _failed_count] if (_failed_count | int) > 0 else [])
+         + (['post_check_failed'] if (_post_failed | bool) else [])
+         + (['reboot_required'] if (_reboot_required | bool) else [])
+         + (['remaining_updates:' ~ _remaining] if (_remaining | int) > 0 else [])
+         + (['not_installed:' ~ _not_installed] if (_not_installed | int) > 0 else []) }}
+    _status: >-
+      {{ 'failed' if ((_search_failed | bool) or (_install_failed | bool) or (_failed_count | int) > 0)
+         else ('partial' if (_problems | length) > 0 else 'ok') }}
+  ansible.builtin.set_fact:
+    windows_updates_summary: >-
+      {{ {
+        'mode': windows_updates_mode,
+        'status': _status,
+        'total': windows_updates_results | length,
+        'found': windows_updates_search.found_update_count | default(0) | int,
+        'installed': _installed_count | int,
+        'failed': _failed_count | int,
+        'remaining': _remaining | int,
+        'reboot_required': _reboot_required | bool,
+        'rebooted': _rebooted | bool,
+        'pending_reboot_before': windows_updates_search.reboot_required | default(false) | bool,
+        'categories': windows_updates_effective_categories | default([]),
+        'server_selection': windows_updates_server_selection,
+        'problems': _problems
+      } }}
+
+- name: windows_updates | Mostrar resumen
+  ansible.builtin.debug:
+    var: windows_updates_summary
+
+- name: windows_updates | Fallar si el estado es 'failed' y se exige
+  ansible.builtin.fail:
+    msg: "windows_updates con problemas: {{ windows_updates_summary.problems }}"
+  when:
+    - windows_updates_fail_on_error | bool
+    - windows_updates_summary.status == 'failed'

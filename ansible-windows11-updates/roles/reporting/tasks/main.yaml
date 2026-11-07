@@ -1,0 +1,161 @@
+---
+# roles/reporting/tasks/main.yaml
+#
+# Consolida los resultados ESTRUCTURADOS de las fases y publica un informe en AWX
+# con set_stats. No se conecta a Windows (solo set_fact/set_stats/debug/fail, que se
+# ejecutan en el controlador), no escribe archivos y no guarda secretos.
+#
+# Estado global (valores en español, según el criterio de aceptación del proyecto):
+#   correcto -> hay evidencia, todas las fases ejecutadas están 'ok' y no falta
+#               ninguna fase requerida.
+#   parcial  -> alguna fase terminó 'partial', o una fase NO crítica falló.
+#   fallido  -> una fase crítica falló, falta una fase requerida, el playbook
+#               registró update_manager_failure, o no hay ninguna fase con resumen
+#               (sin evidencia nunca se declara éxito).
+#
+# Uso recomendado en los playbooks: ejecutar este rol en la sección `always` de un
+# bloque, y en `rescue` fijar update_manager_failure con el nombre de la tarea que falló.
+
+- name: reporting | Validar configuración
+  ansible.builtin.assert:
+    that:
+      - reporting_phases is sequence
+      - reporting_phases is not string
+      - reporting_required_phases is sequence
+      - reporting_required_phases is not string
+    fail_msg: "reporting_phases y reporting_required_phases deben ser listas."
+    quiet: true
+
+- name: reporting | Evaluar estado por fase
+  ansible.builtin.set_fact:
+    reporting_phase_rows: >-
+      {%- set ns = namespace(rows=[]) -%}
+      {%- for ph in reporting_phases -%}
+        {%- set s = vars.get(ph.name ~ '_summary', none) -%}
+        {%- set ns.rows = ns.rows + [ {
+              'name': ph.name,
+              'critical': ph.critical | default(false) | bool,
+              'status': ('not_run' if s is none else (s.status | default('unknown'))),
+              'mode': ('' if s is none else (s.mode | default(''))),
+              'problems': ([] if s is none else (s.problems | default([])))
+            } ] -%}
+      {%- endfor -%}
+      {{ ns.rows }}
+
+- name: reporting | Calcular estado global
+  vars:
+    _ran: "{{ reporting_phase_rows | rejectattr('status', 'equalto', 'not_run') | list }}"
+    _critical_bad: >-
+      {{ _ran | selectattr('critical') | selectattr('status', 'in', ['failed', 'unknown'])
+         | map(attribute='name') | list }}
+    _not_ok: "{{ _ran | rejectattr('status', 'equalto', 'ok') | map(attribute='name') | list }}"
+    _missing: "{{ reporting_required_phases | difference(_ran | map(attribute='name') | list) }}"
+    _forced: "{{ (update_manager_failure | default('')) | string | length > 0 }}"
+  ansible.builtin.set_fact:
+    reporting_critical_failed: "{{ _critical_bad }}"
+    reporting_required_missing: "{{ _missing }}"
+    reporting_overall: >-
+      {{ 'fallido'
+         if ((_ran | length) == 0 or (_critical_bad | length) > 0 or (_missing | length) > 0 or (_forced | bool))
+         else ('parcial' if (_not_ok | length) > 0 else 'correcto') }}
+
+- name: reporting | Consolidar detalle por elemento (sin salida cruda salvo que se pida)
+  ansible.builtin.set_fact:
+    reporting_item_rows: >-
+      {%- set ns = namespace(rows=[]) -%}
+      {%- for ph in reporting_phases -%}
+        {%- for r in vars.get(ph.name ~ '_results', []) -%}
+          {%- set row = {
+                'phase': ph.name,
+                'id': r.id | default('?'),
+                'classification': r.classification | default('unknown'),
+                'rc': {
+                  'before': (r.before | default({})).rc | default(none),
+                  'check': (r.check | default({})).rc | default(none),
+                  'upgrade': (r.upgrade | default({})).rc | default(none),
+                  'after': (r.after | default({})).rc | default(none),
+                  'post_check': (r.post_check | default({})).rc | default(none)
+                },
+                'error': r.error | default('')
+              } -%}
+          {%- if reporting_include_raw_output | bool -%}
+            {%- set row = row | combine({'raw': r}) -%}
+          {%- endif -%}
+          {%- set ns.rows = ns.rows + [row] -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ ns.rows }}
+
+- name: reporting | Verificar que la consolidación produjo listas
+  ansible.builtin.assert:
+    that:
+      - reporting_phase_rows is sequence
+      - reporting_phase_rows is not string
+      - reporting_item_rows is sequence
+      - reporting_item_rows is not string
+    fail_msg: "La consolidación del informe no produjo listas; revisar las variables <fase>_summary/_results."
+    quiet: true
+
+- name: reporting | Construir informe legible
+  ansible.builtin.set_fact:
+    reporting_lines: >-
+      {%- set ns = namespace(l=[]) -%}
+      {%- set ns.l = ns.l + ['==== INFORME update-manager ====',
+                             'Resultado global: ' ~ reporting_overall,
+                             'Host: ' ~ inventory_hostname,
+                             'Fases:'] -%}
+      {%- for p in reporting_phase_rows -%}
+        {%- set ns.l = ns.l + ['  - ' ~ p.name ~ ': ' ~ p.status
+              ~ (' (crítica)' if p.critical else '')
+              ~ (' modo=' ~ p.mode if p.mode else '')
+              ~ (' problemas=' ~ (p.problems | join(',')) if p.problems else '')] -%}
+      {%- endfor -%}
+      {%- if reporting_required_missing | length > 0 -%}
+        {%- set ns.l = ns.l + ['Fases requeridas SIN resumen: ' ~ (reporting_required_missing | join(', '))] -%}
+      {%- endif -%}
+      {%- if (update_manager_failure | default('')) | string | length > 0 -%}
+        {%- set ns.l = ns.l + ['Fallo registrado por el playbook: ' ~ update_manager_failure] -%}
+      {%- endif -%}
+      {%- if reporting_item_rows | length > 0 -%}
+        {%- set ns.l = ns.l + ['Elementos:'] -%}
+      {%- endif -%}
+      {%- for i in reporting_item_rows -%}
+        {%- set ns.l = ns.l + ['  - [' ~ i.phase ~ '] ' ~ i.id ~ ': ' ~ i.classification] -%}
+      {%- endfor -%}
+      {%- set ns.l = ns.l + ['==== FIN DEL INFORME ===='] -%}
+      {{ ns.l }}
+
+- name: reporting | Armar informe estructurado
+  ansible.builtin.set_fact:
+    reporting_report:
+      status: "{{ reporting_overall }}"
+      generated_at: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+      host: "{{ inventory_hostname }}"
+      awx_job_id: "{{ awx_job_id | default('') }}"
+      check_mode: "{{ ansible_check_mode | default(false) }}"
+      failure: "{{ update_manager_failure | default('') }}"
+      required_phases_missing: "{{ reporting_required_missing }}"
+      phases: "{{ reporting_phase_rows }}"
+      items: "{{ reporting_item_rows }}"
+      text: "{{ reporting_lines }}"
+
+- name: reporting | Publicar informe en AWX (set_stats)
+  ansible.builtin.set_stats:
+    data:
+      "{{ reporting_stats_prefix }}_{{ inventory_hostname | regex_replace('[^A-Za-z0-9_]', '_') }}": "{{ reporting_report }}"
+    per_host: false
+    aggregate: false
+
+- name: reporting | Mostrar informe
+  ansible.builtin.debug:
+    msg: "{{ reporting_lines }}"
+
+- name: reporting | Terminar el job como fallido si el resultado global es 'fallido'
+  ansible.builtin.fail:
+    msg: >-
+      Resultado global: fallido. Fases críticas con fallo: {{ reporting_critical_failed }}.
+      Fases requeridas sin resumen: {{ reporting_required_missing }}.
+      El informe ya fue publicado en los artefactos del job.
+  when:
+    - reporting_fail_job_on_failed | bool
+    - reporting_overall == 'fallido'

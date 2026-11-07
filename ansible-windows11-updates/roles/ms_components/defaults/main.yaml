@@ -3,6 +3,9 @@
 #
 # Valores por defecto del rol ms_components.
 # Seguridad: el modo por defecto es 'check' (solo consulta, no instala nada).
+# La lógica vive en el rol `application_updates`; aquí solo se define QUÉ componentes
+# Microsoft se evalúan. Cada entrada puede ser un ID (cadena) o, si hace falta, un
+# diccionario { id: ..., source: winget|msstore }.
 
 # 'check'   -> consulta (winget list / list --upgrade-available). No instala.
 # 'upgrade' -> actualiza SOLO los IDs de la lista que tengan actualización
@@ -33,6 +36,9 @@ ms_components_ids:
   - Microsoft.VCRedist.2015+.x64
   - Microsoft.WindowsAppRuntime.1.7
 
+# Limita la ejecución a estos IDs (subconjunto de ms_components_ids). Vacío = todos.
+ms_components_limit_ids: []
+
 # Tiempo máximo (segundos) por cada invocación de winget.
 ms_components_timeout_seconds: 600
 
@@ -50,3 +56,9 @@ ms_components_problem_classes:
   - other_rc
   - still_outdated
   - upgrade_unverified
+  - blocked_by_process
+
+# Clasificaciones que indican fallo del motor (estado 'failed' en vez de 'partial').
+ms_components_engine_failure_classes:
+  - winget_not_found
+  - script_error

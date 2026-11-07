@@ -1,198 +1,39 @@
 ---
 # roles/ms_components/tasks/main.yaml
 #
-# Evalúa (y opcionalmente actualiza) componentes Microsoft por ID EXACTO de WinGet.
+# Componentes Microsoft gestionados por WinGet. Este rol YA NO contiene lógica propia:
+# es una lista de IDs (defaults/main.yaml) que se evalúa con el motor WinGet del rol
+# `application_updates` (tasks/engine.yaml y files/Invoke-WingetPackage.ps1). Así hay un solo código
+# que mantener y las mismas garantías:
+#   - por defecto solo CONSULTA; 'upgrade' exige update_manager_confirm: INSTALL
+#   - IDs exactos, nunca `--all`; no cierra procesos (forzado a false aquí)
+#   - rc/stdout/stderr por paso y verificación posterior
 #
-# Garantías de diseño:
-#   - Por defecto solo CONSULTA (ms_components_mode: check). No instala nada.
-#   - Nunca usa `winget upgrade --all`.
-#   - No cierra procesos.
-#   - Cada ID se evalúa por separado, con su propio timeout.
-#   - Se conserva rc, stdout y stderr crudos de cada invocación a winget.
-#   - El estado NO se infiere de texto localizado: se usa el rc como pista y,
-#     en modo upgrade, una verificación posterior independiente.
-#   - Scripts compatibles con Windows PowerShell 5.1.
-#
-# Salida (variables para el rol `reporting`):
-#   ms_components_results  -> lista con el detalle por ID
-#   ms_components_summary  -> resumen (modo, total, problemas, estado)
+# Publica (contrato de `reporting`):
+#   ms_components_results -> lista por ID
+#   ms_components_summary -> dict {mode, status (ok|partial|failed), total, problems, ...}
 
-- name: ms_components | Validar entrada y confirmación
+- name: ms_components | Validar modo
   ansible.builtin.assert:
     that:
       - ms_components_mode in ['check', 'upgrade']
-      - ms_components_ids is sequence
-      - ms_components_ids is not string
-      - ms_components_timeout_seconds | int > 0
-      - ms_components_mode == 'check' or (update_manager_confirm | default('')) == 'INSTALL'
-      - ms_components_mode == 'check' or not (ansible_check_mode | default(false))
-    fail_msg: >-
-      Entrada inválida. Revisa: ms_components_mode (check|upgrade),
-      ms_components_ids (lista), ms_components_timeout_seconds (> 0).
-      El modo 'upgrade' exige update_manager_confirm: INSTALL y no admite --check.
-    success_msg: "Entrada válida. Modo: {{ ms_components_mode }}"
-    quiet: false
+    fail_msg: "ms_components_mode debe ser 'check' o 'upgrade'."
+    quiet: true
 
-- name: ms_components | Evaluar cada ID de WinGet
-  ansible.windows.win_powershell:
-    parameters:
-      PackageId: "{{ item }}"
-      Mode: "{{ ms_components_mode }}"
-      TimeoutSeconds: "{{ ms_components_timeout_seconds | int }}"
-    script: |
-      param(
-        [Parameter(Mandatory)][string]$PackageId,
-        [Parameter(Mandatory)][string]$Mode,
-        [int]$TimeoutSeconds = 600
-      )
-      $ErrorActionPreference = 'Stop'
-
-      # Por defecto win_powershell marca changed=true; se ajusta explícitamente más abajo.
-      $Ansible.Changed = $false
-
-      # Códigos HRESULT de WinGet usados SOLO como pista (validar en el host real):
-      #   -1978335212 (0x8A150014) = sin coincidencias
-      #   -1978335189 (0x8A15002B) = sin actualización aplicable
-      $RC_NO_MATCH  = -1978335212
-      $RC_NO_UPDATE = -1978335189
-
-      function Find-Winget {
-        $cmd = Get-Command winget.exe -ErrorAction SilentlyContinue
-        if ($cmd) { return $cmd.Source }
-        # Alias MSIX no está en PATH en sesiones no interactivas; requiere privilegios de admin.
-        $c = Get-ChildItem "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue |
-             Sort-Object FullName -Descending | Select-Object -First 1
-        if ($c) { return $c.FullName }
-        return $null
-      }
-
-      function Invoke-Winget {
-        param([string]$Exe, [string[]]$WgArgs, [int]$Timeout)
-        $o = [IO.Path]::GetTempFileName()
-        $e = [IO.Path]::GetTempFileName()
-        try {
-          $p = Start-Process -FilePath $Exe -ArgumentList $WgArgs -NoNewWindow -PassThru `
-                 -RedirectStandardOutput $o -RedirectStandardError $e
-          $null = $p.Handle   # necesario en PS 5.1 para poder leer ExitCode
-          $timedOut = -not $p.WaitForExit($Timeout * 1000)
-          if ($timedOut) { try { $p.Kill() } catch { } }
-          [pscustomobject]@{
-            args      = ($WgArgs -join ' ')
-            rc        = $(if ($timedOut) { $null } else { $p.ExitCode })
-            timed_out = $timedOut
-            stdout    = [IO.File]::ReadAllText($o, [Text.Encoding]::UTF8)
-            stderr    = [IO.File]::ReadAllText($e, [Text.Encoding]::UTF8)
-          }
-        } finally {
-          Remove-Item -LiteralPath $o, $e -Force -ErrorAction SilentlyContinue
-        }
-      }
-
-      $res = [ordered]@{
-        id             = $PackageId
-        mode           = $Mode
-        winget_path    = $null
-        classification = 'script_error'
-        error          = $null
-      }
-
-      try {
-        $wg = Find-Winget
-        $res.winget_path = $wg
-        if (-not $wg) {
-          $res.classification = 'winget_not_found'
-        } else {
-          $common = @('--id', $PackageId, '--exact', '--source', 'winget', '--accept-source-agreements')
-
-          # 1) Estado actual (¿está instalado con ese ID?) y 2) ¿hay actualización?
-          $res.before = Invoke-Winget $wg (@('list') + $common) $TimeoutSeconds
-          $res.check  = Invoke-Winget $wg (@('list', '--upgrade-available') + $common) $TimeoutSeconds
-
-          if ($res.before.timed_out -or $res.check.timed_out) {
-            $res.classification = 'timeout'
-          } elseif ($res.before.rc -eq $RC_NO_MATCH) {
-            $res.classification = 'not_installed'
-          } elseif ($res.before.rc -ne 0) {
-            $res.classification = 'other_rc'
-          } elseif ($res.check.rc -eq $RC_NO_MATCH) {
-            $res.classification = 'up_to_date'
-          } elseif ($res.check.rc -ne 0) {
-            $res.classification = 'other_rc'
-          } else {
-            $res.classification = 'update_available'
-          }
-
-          # 3) Solo en modo upgrade y solo si hay actualización disponible para ESTE id.
-          if ($Mode -eq 'upgrade' -and $res.classification -eq 'update_available') {
-            $res.upgrade = Invoke-Winget $wg (@('upgrade') + $common + @('--silent', '--disable-interactivity', '--accept-package-agreements')) $TimeoutSeconds
-            if ($res.upgrade.timed_out) {
-              $res.classification = 'timeout'
-            } else {
-              # Verificación posterior independiente (no depende del texto de winget).
-              $res.after      = Invoke-Winget $wg (@('list') + $common) $TimeoutSeconds
-              $res.post_check = Invoke-Winget $wg (@('list', '--upgrade-available') + $common) $TimeoutSeconds
-              if ($res.upgrade.rc -eq 0 -and $res.post_check.rc -eq $RC_NO_MATCH) {
-                $res.classification = 'upgraded'
-                $Ansible.Changed = $true
-              } elseif ($res.upgrade.rc -eq 0 -and $res.post_check.rc -eq 0) {
-                $res.classification = 'still_outdated'
-              } elseif ($res.upgrade.rc -eq 0) {
-                $res.classification = 'upgrade_unverified'
-              } elseif ($res.upgrade.rc -eq $RC_NO_UPDATE) {
-                $res.classification = 'up_to_date'
-              } else {
-                $res.classification = 'other_rc'
-              }
-            }
-          }
-        }
-      } catch {
-        $res.classification = 'script_error'
-        $res.error = $_.Exception.Message
-      }
-
-      $Ansible.Result = $res
-  loop: "{{ ms_components_ids }}"
-  loop_control:
-    label: "{{ item }}"
-  register: ms_components_raw
-  failed_when: false
-
-- name: ms_components | Consolidar resultados estructurados
-  ansible.builtin.set_fact:
-    ms_components_results: >-
-      {{ ms_components_raw.results
-         | map(attribute='result', default={'classification': 'script_error'})
-         | list }}
-
-- name: ms_components | Construir resumen
+- name: ms_components | Evaluar componentes con el motor WinGet
+  ansible.builtin.include_role:
+    name: application_updates
+    tasks_from: engine
   vars:
-    _classes: >-
-      {{ ms_components_results
-         | map(attribute='classification', default='script_error')
-         | list }}
-    _pairs: "{{ ms_components_ids | zip(_classes) | list }}"
-    _problems: >-
-      {{ _pairs
-         | selectattr('1', 'in', ms_components_problem_classes)
-         | map(attribute='0')
-         | list }}
-  ansible.builtin.set_fact:
-    ms_components_summary:
-      mode: "{{ ms_components_mode }}"
-      total: "{{ ms_components_ids | length | int }}"
-      update_available: "{{ _pairs | selectattr('1', 'equalto', 'update_available') | map(attribute='0') | list }}"
-      upgraded: "{{ _pairs | selectattr('1', 'equalto', 'upgraded') | map(attribute='0') | list }}"
-      problems: "{{ _problems }}"
-      status: "{{ 'ok' if (_problems | length) == 0 else 'partial' }}"
-
-- name: ms_components | Mostrar resumen
-  ansible.builtin.debug:
-    var: ms_components_summary
-
-- name: ms_components | Fallar si hay problemas y se exige
-  ansible.builtin.fail:
-    msg: "Componentes con problemas: {{ ms_components_summary.problems }}"
-  when:
-    - ms_components_fail_on_error | bool
-    - ms_components_summary.problems | length > 0
+    winget_engine_mode: "{{ ms_components_mode }}"
+    winget_engine_apps: "{{ ms_components_ids }}"
+    winget_engine_limit_ids: "{{ ms_components_limit_ids }}"
+    winget_engine_default_source: winget
+    winget_engine_timeout_seconds: "{{ ms_components_timeout_seconds }}"
+    winget_engine_close_processes: false
+    winget_engine_force_close: false
+    winget_engine_grace_seconds: 20
+    winget_engine_fail_on_error: "{{ ms_components_fail_on_error }}"
+    winget_engine_problem_classes: "{{ ms_components_problem_classes }}"
+    winget_engine_failure_classes: "{{ ms_components_engine_failure_classes }}"
+    winget_engine_result_prefix: ms_components

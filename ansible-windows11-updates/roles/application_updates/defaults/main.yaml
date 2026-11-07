@@ -1,0 +1,108 @@
+---
+# roles/application_updates/defaults/main.yaml
+#
+# Motor de actualización de aplicaciones con WinGet por ID EXACTO (sustituye al antiguo
+# rol `winget_updates`). Por defecto solo CONSULTA. Nunca usa `winget upgrade --all`.
+
+# 'check'   -> list / list --upgrade-available. No instala nada.
+# 'upgrade' -> actualiza SOLO las apps de la lista con actualización disponible.
+#              Exige update_manager_confirm: INSTALL y no admite --check.
+application_updates_mode: check
+
+# Fuente por defecto de cada app (winget | msstore). Se puede fijar por app.
+application_updates_default_source: winget
+
+# Límite de tiempo (segundos) por cada invocación de winget.
+application_updates_timeout_seconds: 900
+
+# Limita la ejecución a estos IDs (subconjunto de la lista). Vacío = toda la lista.
+# Útil para la primera instalación controlada: application_updates_limit_ids: ['7zip.7zip']
+application_updates_limit_ids: []
+
+# --- Cierre de procesos (OPT-IN; desactivado por defecto) ---------------------------
+# Si es true y la app define `stop_processes`, antes de actualizar ESA app (y solo si
+# tiene actualización disponible) se intenta un cierre ordenado. Los procesos de otra
+# sesión de usuario suelen ignorar el cierre ordenado.
+application_updates_close_processes: false
+# Si es true, los procesos que sigan vivos tras el cierre ordenado se terminan con
+# Stop-Process -Force (puede perder trabajo sin guardar). Si es false y quedan procesos,
+# la app NO se actualiza y se clasifica como 'blocked_by_process'.
+application_updates_force_close: false
+application_updates_grace_seconds: 20
+
+# Si es true, el rol falla al final cuando hay apps en application_updates_problem_classes.
+# Si es false solo lo reporta (estado 'partial' o 'failed') y decide `reporting`.
+application_updates_fail_on_error: false
+
+# Clasificaciones (derivadas de rc; son pistas) que cuentan como problema.
+application_updates_problem_classes:
+  - winget_not_found
+  - script_error
+  - not_installed
+  - timeout
+  - other_rc
+  - still_outdated
+  - upgrade_unverified
+  - blocked_by_process
+
+# Clasificaciones que indican fallo del motor (estado 'failed' en vez de 'partial').
+application_updates_engine_failure_classes:
+  - winget_not_found
+  - script_error
+
+# Lista de aplicaciones. Cada entrada es un ID (cadena) o un diccionario:
+#   { id: <ID exacto>, source: winget|msstore, stop_processes: [<nombres de proceso>] }
+#
+# Se incluyen solo IDs que aparecen con origen `winget` (o `msstore`) en el `winget list`
+# del equipo (2026-11-05). OJO: ese listado se hizo con tu usuario interactivo. Bajo la
+# identidad de AWX `winget list` puede mostrar un conjunto distinto (sobre todo apps
+# instaladas por usuario); la primera consulta lo dirá con la clasificación `not_installed`.
+application_updates_apps:
+  - 7zip.7zip
+  - AppWork.JDownloader
+  - Baidu.TeraBox
+  - CPUID.HWMonitor
+  - ElectronicArts.EADesktop
+  - id: ElementLabs.LMStudio
+    stop_processes: ["LM Studio", "LMStudio"]
+  - id: EpicGames.EpicGamesLauncher
+    stop_processes: ["EpicGamesLauncher", "EpicWebHelper", "UnrealEngineLauncher"]
+  - EpicGames.EpicOnlineServices
+  - Git.Git
+  - Google.Chrome.EXE            # el ID real NO es Google.Chrome
+  - Google.PlayGames
+  - Guru3D.RTSS
+  - Hashicorp.Vagrant
+  - Intel.IntelDriverAndSupportAssistant
+  - Microsoft.VisualStudioCode   # instalación "User": bajo la identidad de AWX puede no verse
+  - JAMSoftware.TreeSize.Free
+  - JanDeDobbeleer.OhMyPosh
+  - namazso.PawnIO
+  - Nvidia.PhysX
+  - Ollama.Ollama
+  - OpenAI.ChatGPT
+  - Oracle.VirtualBox
+  - Perplexity.Comet
+  - PuTTY.PuTTY
+  - Python.Python.3.10
+  - Python.PythonInstallManager
+  - RockstarGames.Launcher
+  - Skillbrains.Lightshot
+  - Tailscale.Tailscale
+  - Telegram.TelegramDesktop
+  - Valve.Steam
+  - VideoLAN.VLC
+  - WiresharkFoundation.Wireshark
+  # Microsoft Store (puede requerir sesión interactiva/credenciales de Store; la consulta lo dirá):
+  - id: XP9KN75RRB9NHS           # CapCut
+    source: msstore
+
+# Apps de tu lista original que NO se pueden gestionar por ID de WinGet en este equipo
+# (aparecen con ID `ARP\...` o `MSIX\...`, es decir, WinGet no las correlaciona):
+#   Brave, Mozilla Firefox, WinSCP, Npcap, NoxPlayer, MSI Afterburner, VMware Workstation,
+#   Ubisoft Connect (no aparece instalado), NVIDIA App/driver, ASUS/Armoury Crate, McAfee.
+# Candidatos con ID incompleto o ambiguo en tu listado (completa con `winget list --id ...`):
+#   - LibreHardwareMonitor.LibreHardware...  (ID truncado en la salida)
+#   - Python.Launcher                        (aparece dos veces: 3.13.5 y '< 3.10.8')
+# Los componentes Microsoft (Edge, OneDrive, Teams, PowerShell, runtimes) van en el rol
+# ms_components.

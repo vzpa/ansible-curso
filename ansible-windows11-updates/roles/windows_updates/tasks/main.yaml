@@ -1,38 +1,126 @@
-- block:
-    - name: Crear carpeta de logs si no existe
-      ansible.windows.win_shell: |
-        if (-Not (Test-Path "{{ log_path }}")) {
-          New-Item -ItemType Directory -Path "{{ log_path }}"
-        }
+---
+# roles/windows_updates/tasks/main.yaml
+#
+# Consulta (por defecto) o instala actualizaciones de Windows con
+# ansible.windows.win_updates. No usa async (incompatible con reboot: true).
+#
+# Flujo:
+#   1) validar entrada y confirmación
+#   2) calcular el alcance efectivo (categorías) y mostrarlo
+#   3) buscar (state: searched) -> siempre
+#   4) instalar solo en modo install y solo si la búsqueda encontró algo
+#   5) verificación posterior (nueva búsqueda) tras instalar
+#   6) consolidar resultados/resumen para el rol `reporting` (summarize.yaml)
+#
+# Publica: windows_updates_results (lista) y windows_updates_summary (dict).
 
-    - name: Ejecutar Windows Update
-      ansible.windows.win_updates:
-        category_names:
-          - SecurityUpdates
-          - CriticalUpdates
-          - UpdateRollups
-          - FeaturePacks
-          - ServicePacks
-          - Drivers
-          - DefinitionUpdates
-          - Updates
-        reboot: yes
-        log_path: "{{ log_path }}win_updates.log"
-      register: win_updates_result
+- name: windows_updates | Validar entrada y confirmación
+  ansible.builtin.assert:
+    that:
+      - windows_updates_mode in ['check', 'install']
+      - windows_updates_mode == 'check' or (update_manager_confirm | default('')) == 'INSTALL'
+      - windows_updates_mode == 'check' or not (ansible_check_mode | default(false))
+      - not (windows_updates_reboot | bool) or windows_updates_mode == 'install'
+      - windows_updates_server_selection in ['default', 'managed_server', 'windows_update']
+      - not ((windows_updates_include_drivers | bool) and (windows_updates_skip_optional | bool))
+      - windows_updates_base_categories is sequence and windows_updates_base_categories is not string
+      - windows_updates_extra_categories is sequence and windows_updates_extra_categories is not string
+      - windows_updates_accept_list is sequence and windows_updates_accept_list is not string
+      - windows_updates_reject_list is sequence and windows_updates_reject_list is not string
+      - windows_updates_reboot_timeout | int > 0
+    fail_msg: >-
+      Entrada inválida. Reglas: modo check|install; 'install' exige
+      update_manager_confirm: INSTALL y no admite --check; windows_updates_reboot solo
+      con modo install; server_selection en [default, managed_server, windows_update];
+      con windows_updates_include_drivers=true, windows_updates_skip_optional debe ser false.
+    success_msg: "Entrada válida. Modo: {{ windows_updates_mode }}"
+    quiet: false
 
-    - name: Registrar resultado en reporte
-      ansible.windows.win_shell: |
-        if ("{{ win_updates_result.updates | length }}" -eq 0) {
-          Add-Content -Path "{{ report_file }}" -Value "No había actualizaciones pendientes en Windows Update."
-        } else {
-          Add-Content -Path "{{ report_file }}" -Value "Windows Updates instaladas: {{ win_updates_result.updates }}"
-        }
-        Add-Content -Path "{{ report_file }}" -Value "Reinicio requerido: {{ win_updates_result.reboot_required }}"
-  rescue:
-    - name: Registrar error en reporte
-      ansible.windows.win_shell: |
-        Add-Content -Path "{{ report_file }}" -Value "Error en Windows Update: {{ ansible_failed_result }}"
-  always:
-    - name: Confirmar finalización de rol Windows Updates
-      ansible.windows.win_shell: |
-        Add-Content -Path "{{ report_file }}" -Value "Finalizó rol Windows Updates"
+- name: windows_updates | Calcular alcance efectivo
+  ansible.builtin.set_fact:
+    windows_updates_effective_categories: >-
+      {{ (windows_updates_base_categories
+          + windows_updates_extra_categories
+          + (['Drivers'] if windows_updates_include_drivers | bool else [])
+          + (['FeaturePacks'] if windows_updates_include_feature_packs | bool else [])
+          + (['Upgrades'] if windows_updates_include_upgrades | bool else []))
+         | unique | list }}
+
+- name: windows_updates | Mostrar alcance efectivo
+  ansible.builtin.debug:
+    msg:
+      - "Modo: {{ windows_updates_mode }}"
+      - "Categorías: {{ windows_updates_effective_categories | join(', ') }}"
+      - "Catálogo (server_selection): {{ windows_updates_server_selection }}"
+      - "Omitir opcionales: {{ windows_updates_skip_optional | bool }}"
+      - "Reinicio automático: {{ windows_updates_reboot | bool }}"
+      - "Lista aceptada: {{ windows_updates_accept_list }} | Lista rechazada: {{ windows_updates_reject_list }}"
+
+- name: windows_updates | Crear directorio de log (solo si se definió log_path)
+  ansible.windows.win_file:
+    path: "{{ windows_updates_log_path | ansible.builtin.win_dirname }}"
+    state: directory
+  when: windows_updates_log_path | length > 0
+
+- name: windows_updates | Buscar actualizaciones (sin instalar)
+  ansible.windows.win_updates:
+    state: searched
+    category_names: "{{ windows_updates_effective_categories }}"
+    server_selection: "{{ windows_updates_server_selection }}"
+    skip_optional: "{{ windows_updates_skip_optional | bool }}"
+    accept_list: "{{ windows_updates_accept_list | default(omit, true) }}"
+    reject_list: "{{ windows_updates_reject_list | default(omit, true) }}"
+    log_path: "{{ windows_updates_log_path | default(omit, true) }}"
+  become: "{{ windows_updates_use_become | bool }}"
+  become_method: runas
+  become_user: SYSTEM
+  register: windows_updates_search
+  failed_when: false
+
+- name: windows_updates | Instalar actualizaciones (requiere confirmación)
+  ansible.windows.win_updates:
+    state: installed
+    category_names: "{{ windows_updates_effective_categories }}"
+    server_selection: "{{ windows_updates_server_selection }}"
+    skip_optional: "{{ windows_updates_skip_optional | bool }}"
+    accept_list: "{{ windows_updates_accept_list | default(omit, true) }}"
+    reject_list: "{{ windows_updates_reject_list | default(omit, true) }}"
+    log_path: "{{ windows_updates_log_path | default(omit, true) }}"
+    reboot: "{{ windows_updates_reboot | bool }}"
+    reboot_timeout: "{{ windows_updates_reboot_timeout | int }}"
+  become: "{{ windows_updates_use_become | bool }}"
+  become_method: runas
+  become_user: SYSTEM
+  register: windows_updates_install
+  failed_when: false
+  when:
+    - windows_updates_mode == 'install'
+    - not (windows_updates_search.failed | default(false))
+    - (windows_updates_search.found_update_count | default(0) | int) > 0
+
+- name: windows_updates | Esperar estabilidad tras reinicio
+  ansible.builtin.wait_for_connection:
+    delay: "{{ windows_updates_post_reboot_delay | int }}"
+    timeout: "{{ windows_updates_post_reboot_timeout | int }}"
+  when:
+    - windows_updates_install is not skipped
+    - windows_updates_install.rebooted | default(false) | bool
+
+- name: windows_updates | Verificación posterior (nueva búsqueda)
+  ansible.windows.win_updates:
+    state: searched
+    category_names: "{{ windows_updates_effective_categories }}"
+    server_selection: "{{ windows_updates_server_selection }}"
+    skip_optional: "{{ windows_updates_skip_optional | bool }}"
+    accept_list: "{{ windows_updates_accept_list | default(omit, true) }}"
+    reject_list: "{{ windows_updates_reject_list | default(omit, true) }}"
+    log_path: "{{ windows_updates_log_path | default(omit, true) }}"
+  become: "{{ windows_updates_use_become | bool }}"
+  become_method: runas
+  become_user: SYSTEM
+  register: windows_updates_post
+  failed_when: false
+  when: windows_updates_install is not skipped
+
+- name: windows_updates | Consolidar resultados y resumen
+  ansible.builtin.import_tasks: summarize.yaml

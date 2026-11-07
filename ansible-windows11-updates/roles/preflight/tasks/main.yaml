@@ -1,0 +1,109 @@
+---
+# roles/preflight/tasks/main.yaml
+#
+# Comprobaciones previas de solo lectura. Responde, con evidencia, a:
+#   - ¿qué versión de PowerShell usa realmente el módulo de Ansible?
+#   - ¿con qué identidad conecta AWX y es administrador?
+#   - ¿Windows 11? ¿servicios de actualización habilitados? ¿reinicio pendiente? ¿espacio?
+#   - ¿hay políticas de Windows Update (WSUS, acceso deshabilitado)?
+#   - ¿funciona WinGet bajo ESA identidad/sesión?
+# Que el job llegue hasta aquí demuestra además la conectividad de AWX con el equipo.
+#
+# Publica (contrato de `reporting`):
+#   preflight_results -> una fila por comprobación {id, classification: ok|warn|fail, detail, data}
+#   preflight_summary -> {mode, status (ok|partial|failed), problems, facts, connection, ...}
+#
+# Estado: 'failed' si alguna comprobación es 'fail'; 'partial' si alguna es 'warn'.
+
+- name: preflight | Validar entrada
+  ansible.builtin.assert:
+    that:
+      - preflight_min_free_gb | float > 0
+      - preflight_min_powershell_version is match('^[0-9]+\.[0-9]+$')
+      - preflight_winget_timeout_seconds | int > 0
+    fail_msg: >-
+      Entrada inválida: preflight_min_free_gb > 0, preflight_min_powershell_version con
+      formato mayor.menor (p. ej. 5.1) y preflight_winget_timeout_seconds > 0.
+    quiet: true
+
+- name: preflight | Ejecutar comprobaciones de solo lectura
+  ansible.windows.win_powershell:
+    script: "{{ lookup('ansible.builtin.file', 'Test-UpdatePrerequisites.ps1') }}"
+    parameters:
+      MinFreeGb: "{{ preflight_min_free_gb | float }}"
+      MinPsVersion: "{{ preflight_min_powershell_version }}"
+      WingetTimeout: "{{ preflight_winget_timeout_seconds | int }}"
+      RequireWinget: "{{ preflight_require_winget | bool }}"
+    depth: 6
+  register: preflight_raw
+  failed_when: false
+
+- name: preflight | Consolidar resultados
+  vars:
+    _script_ok: >-
+      {{ not (preflight_raw.failed | default(false) | bool)
+         and ((preflight_raw.result | default({})).checks | default([]) | length) > 0 }}
+    _fallback:
+      - id: preflight_script
+        classification: fail
+        detail: "{{ preflight_raw.msg | default('el script no devolvió resultados') }}"
+        data: null
+  ansible.builtin.set_fact:
+    preflight_results: >-
+      {%- set ns = namespace(rows=[]) -%}
+      {%- set src = (preflight_raw.result.checks if (_script_ok | bool) else _fallback) -%}
+      {%- for c in src -%}
+        {%- set ns.rows = ns.rows + [ {
+              'id': c.id | default('?'),
+              'classification': c.classification | default('fail'),
+              'detail': c.detail | default(''),
+              'error': (c.detail | default('')) if ((c.classification | default('fail')) != 'ok') else '',
+              'data': c.data | default(none)
+            } ] -%}
+      {%- endfor -%}
+      {{ ns.rows }}
+
+- name: preflight | Construir resumen
+  vars:
+    _fail_ids: "{{ preflight_results | selectattr('classification', 'equalto', 'fail') | map(attribute='id') | list }}"
+    _warn_ids: "{{ preflight_results | selectattr('classification', 'equalto', 'warn') | map(attribute='id') | list }}"
+    _data: "{{ preflight_results | items2dict(key_name='id', value_name='data') }}"
+  ansible.builtin.set_fact:
+    preflight_summary: >-
+      {{ {
+        'mode': 'check',
+        'status': ('failed' if (_fail_ids | length) > 0 else ('partial' if (_warn_ids | length) > 0 else 'ok')),
+        'total': preflight_results | length,
+        'problems': _fail_ids + _warn_ids,
+        'facts': {
+          'computer': ((preflight_raw.result | default({})).computer | default('')),
+          'powershell_version': ((_data.powershell | default({}, true)).version | default('')),
+          'powershell_edition': ((_data.powershell | default({}, true)).edition | default('')),
+          'identity': ((_data.identity_admin | default({}, true)).identity | default('')),
+          'is_admin': ((_data.identity_admin | default({}, true)).is_admin | default(none)),
+          'windows_build': ((_data.os | default({}, true)).build | default('')),
+          'is_windows_11': ((_data.os | default({}, true)).is_windows_11 | default(none)),
+          'winget_version': ((_data.winget | default({}, true)).version | default('')),
+          'winget_path': ((_data.winget | default({}, true)).path | default('')),
+          'wsus_configured': ((_data.update_policy | default({}, true)).wsus_configured | default(none)),
+          'reboot_pending': (((_data.pending_reboot | default({}, true)).cbs_reboot_pending | default(false))
+                             or ((_data.pending_reboot | default({}, true)).windows_update_reboot_required | default(false)))
+        },
+        'connection': {
+          'ansible_connection': (ansible_connection | default('')),
+          'winrm_transport': (ansible_winrm_transport | default('')),
+          'port': (ansible_port | default('') | string),
+          'winrm_server_cert_validation': (ansible_winrm_server_cert_validation | default(''))
+        }
+      } }}
+
+- name: preflight | Mostrar resumen
+  ansible.builtin.debug:
+    var: preflight_summary
+
+- name: preflight | Fallar si el estado es 'failed' y se exige
+  ansible.builtin.fail:
+    msg: "preflight con fallos: {{ preflight_summary.problems }}"
+  when:
+    - preflight_fail_on_error | bool
+    - preflight_summary.status == 'failed'

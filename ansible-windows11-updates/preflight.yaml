@@ -1,0 +1,44 @@
+---
+# preflight.yaml
+#
+# Comprobaciones previas de SOLO LECTURA. No instala, no descarga, no reinicia y no
+# modifica servicios. Es la PRIMERA prueba que conviene lanzar desde AWX: demuestra la
+# conectividad, el PowerShell efectivo, la identidad y sus privilegios, y si WinGet
+# funciona bajo esa identidad, antes de consultar o instalar nada.
+#
+# Variables opcionales (todas con valor por defecto, ver roles/preflight/defaults):
+#   update_manager_hosts               Grupo/host destino (defecto: windows)
+#   preflight_min_free_gb              Espacio libre mínimo en la unidad del sistema
+#   preflight_require_winget           true = que WinGet no funcione es un fallo
+#
+# Evidencia: informe `update_manager_report_<host>` en los artefactos del job (set_stats)
+# con el estado de cada comprobación, su detalle y los datos recogidos (versión de
+# PowerShell, identidad, build de Windows, versión y ruta de WinGet, etc.).
+#
+# Validar sintaxis (sin conectar a Windows):
+#   ansible-playbook --syntax-check -i localhost, preflight.yaml
+
+- name: Comprobaciones previas (solo lectura)
+  hosts: "{{ update_manager_hosts | default('windows') }}"
+  gather_facts: false
+
+  vars:
+    reporting_required_phases:
+      - preflight
+
+  tasks:
+    - name: Preflight
+      block:
+        - name: Comprobaciones previas
+          ansible.builtin.include_role:
+            name: preflight
+
+      rescue:
+        - name: Registrar la tarea que falló (para el informe)
+          ansible.builtin.set_fact:
+            update_manager_failure: "{{ ansible_failed_task.name | default('desconocida') }}"
+
+      always:
+        - name: Publicar informe
+          ansible.builtin.include_role:
+            name: reporting

@@ -37,7 +37,8 @@
               'critical': ph.critical | default(false) | bool,
               'status': ('not_run' if s is none else (s.status | default('unknown'))),
               'mode': ('' if s is none else (s.mode | default(''))),
-              'problems': ([] if s is none else (s.problems | default([])))
+              'problems': ([] if s is none else (s.problems | default([]))),
+              'summary': ('' if s is none else s)
             } ] -%}
       {%- endfor -%}
       {{ ns.rows }}
@@ -76,8 +77,12 @@
                   'after': (r.after | default({})).rc | default(none),
                   'post_check': (r.post_check | default({})).rc | default(none)
                 },
+                'detail': r.detail | default(''),
                 'error': r.error | default('')
               } -%}
+          {%- if r.data is defined -%}
+            {%- set row = row | combine({'data': r.data}) -%}
+          {%- endif -%}
           {%- if reporting_include_raw_output | bool -%}
             {%- set row = row | combine({'raw': r}) -%}
           {%- endif -%}
@@ -120,7 +125,8 @@
         {%- set ns.l = ns.l + ['Elementos:'] -%}
       {%- endif -%}
       {%- for i in reporting_item_rows -%}
-        {%- set ns.l = ns.l + ['  - [' ~ i.phase ~ '] ' ~ i.id ~ ': ' ~ i.classification] -%}
+        {%- set ns.l = ns.l + ['  - [' ~ i.phase ~ '] ' ~ i.id ~ ': ' ~ i.classification
+              ~ ((' | ' ~ i.detail) if i.detail else '')] -%}
       {%- endfor -%}
       {%- set ns.l = ns.l + ['==== FIN DEL INFORME ===='] -%}
       {{ ns.l }}

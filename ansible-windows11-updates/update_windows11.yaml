@@ -1,16 +1,21 @@
 ---
-# update_windows11.yml
+# update_windows11.yaml
 #
 # INSTALA actualizaciones de Windows 11 y de aplicaciones. Está BLOQUEADO: sin
 # update_manager_confirm: INSTALL no hace nada (falla antes de tocar el equipo).
-# Ejecútalo solo después de revisar el informe de check_updates.yml.
+# Ejecútalo solo después de revisar el informe de check_updates.yaml.
 #
 # Confirmación (obligatoria):
 #   update_manager_confirm: INSTALL        (exactamente así, en mayúsculas)
 #
 # Fases (cada una se puede desactivar; por defecto todas activas):
-#   update_manager_run_windows_updates       update_manager_run_application_updates
-#   update_manager_run_ms_components
+#   update_manager_run_preflight             update_manager_run_windows_updates
+#   update_manager_run_application_updates   update_manager_run_ms_components
+#
+# Puertas (si fallan, las fases siguientes se OMITEN y el resultado global es 'fallido'):
+#   - preflight en 'failed' omite TODAS las fases de instalación.
+#   - windows_updates en 'failed' omite las aplicaciones y los componentes Microsoft.
+#   update_manager_continue_on_failure: true salta ambas puertas.
 #
 # Alcance, categorías y reinicio: visibles y modificables desde la encuesta/extra vars
 # de AWX. Todos tienen un valor por defecto CONSERVADOR:
@@ -23,7 +28,7 @@
 #   ms_components_limit_ids: []                 Limitar componentes Microsoft a estos IDs
 #   application_updates_close_processes: false  Cierre ordenado de procesos de la app
 #   application_updates_force_close: false      Cierre FORZADO (puede perder trabajo sin guardar)
-#   update_manager_continue_on_failure: false   Si Windows Update falla, omitir las apps
+#   update_manager_continue_on_failure: false   Seguir tras un fallo de preflight/Windows Update
 #
 # No ejecutar con --check: los roles lo rechazan (instalar en modo prueba no tiene sentido).
 #
@@ -31,7 +36,7 @@
 # Si el resultado global es 'fallido', el job termina como failed DESPUÉS de publicarlo.
 #
 # Validar sintaxis (sin conectar a Windows):
-#   ansible-playbook --syntax-check -i localhost, update_windows11.yml
+#   ansible-playbook --syntax-check -i localhost, update_windows11.yaml
 
 - name: Instalar actualizaciones de Windows 11 (requiere confirmación explícita)
   hosts: "{{ update_manager_hosts | default('windows') }}"
@@ -39,9 +44,18 @@
 
   vars:
     reporting_required_phases: >-
-      {{ (['windows_updates'] if (update_manager_run_windows_updates | default(true) | bool) else [])
+      {{ (['preflight'] if (update_manager_run_preflight | default(true) | bool) else [])
+         + (['windows_updates'] if (update_manager_run_windows_updates | default(true) | bool) else [])
          + (['application_updates'] if (update_manager_run_application_updates | default(true) | bool) else [])
          + (['ms_components'] if (update_manager_run_ms_components | default(true) | bool) else []) }}
+    # Puerta 1: preflight falló y no se pidió continuar.
+    update_manager_preflight_blocked: >-
+      {{ ((preflight_summary.status | default('ok')) == 'failed')
+         and not (update_manager_continue_on_failure | default(false) | bool) }}
+    # Puerta 2: Windows Update falló y no se pidió continuar (solo afecta a las apps).
+    update_manager_windows_blocked: >-
+      {{ ((windows_updates_summary.status | default('ok')) == 'failed')
+         and not (update_manager_continue_on_failure | default(false) | bool) }}
 
   pre_tasks:
     - name: Exigir confirmación explícita antes de cualquier cambio
@@ -51,37 +65,49 @@
           - not (ansible_check_mode | default(false))
         fail_msg: >-
           Instalación bloqueada: define update_manager_confirm: INSTALL (en mayúsculas)
-          y no uses --check. Para solo consultar usa check_updates.yml.
+          y no uses --check. Para solo consultar usa check_updates.yaml.
         quiet: true
 
     - name: Mostrar alcance de la ejecución
       ansible.builtin.debug:
         msg:
+          - "Preflight: {{ update_manager_run_preflight | default(true) | bool }}"
           - "Windows Update: {{ update_manager_run_windows_updates | default(true) | bool }}"
           - "Aplicaciones WinGet: {{ update_manager_run_application_updates | default(true) | bool }}"
           - "Componentes Microsoft: {{ update_manager_run_ms_components | default(true) | bool }}"
           - "Reinicio automático: {{ windows_updates_reboot | default(false) | bool }}"
-          - "Seguir con apps si Windows Update falla: {{ update_manager_continue_on_failure | default(false) | bool }}"
+          - "Seguir tras un fallo de preflight/Windows Update: {{ update_manager_continue_on_failure | default(false) | bool }}"
 
   tasks:
     - name: Instalación por fases
       block:
+        - name: Preflight (solo lectura)
+          ansible.builtin.include_role:
+            name: preflight
+          when: update_manager_run_preflight | default(true) | bool
+
+        - name: Informar si se omite la instalación por fallo de preflight
+          ansible.builtin.debug:
+            msg: "Se omiten TODAS las fases de instalación: preflight terminó en 'failed'. No se ha modificado el equipo."
+          when: update_manager_preflight_blocked | bool
+
         - name: Windows Update (instalación)
           ansible.builtin.include_role:
             name: windows_updates
           vars:
             windows_updates_mode: install
-          when: update_manager_run_windows_updates | default(true) | bool
+          when:
+            - update_manager_run_windows_updates | default(true) | bool
+            - not (update_manager_preflight_blocked | bool)
 
-        # Si Windows Update falló, no se tocan las aplicaciones salvo que se pida lo contrario.
         # La fase omitida aparece como 'not_run' y, al ser requerida, el resultado global
         # es 'fallido'.
         - name: Informar si se omiten las aplicaciones por fallo de Windows Update
           ansible.builtin.debug:
             msg: "Se omiten las fases de aplicaciones: windows_updates terminó en 'failed'."
           when:
-            - (windows_updates_summary.status | default('ok')) == 'failed'
-            - not (update_manager_continue_on_failure | default(false) | bool)
+            - not (update_manager_preflight_blocked | bool)
+            - update_manager_windows_blocked | bool
 
         - name: Aplicaciones WinGet (actualización)
           ansible.builtin.include_role:
@@ -90,7 +116,8 @@
             application_updates_mode: upgrade
           when:
             - update_manager_run_application_updates | default(true) | bool
-            - (update_manager_continue_on_failure | default(false) | bool) or ((windows_updates_summary.status | default('ok')) != 'failed')
+            - not (update_manager_preflight_blocked | bool)
+            - not (update_manager_windows_blocked | bool)
 
         - name: Componentes Microsoft (actualización)
           ansible.builtin.include_role:
@@ -99,7 +126,8 @@
             ms_components_mode: upgrade
           when:
             - update_manager_run_ms_components | default(true) | bool
-            - (update_manager_continue_on_failure | default(false) | bool) or ((windows_updates_summary.status | default('ok')) != 'failed')
+            - not (update_manager_preflight_blocked | bool)
+            - not (update_manager_windows_blocked | bool)
 
       rescue:
         - name: Registrar la tarea que falló (para el informe)

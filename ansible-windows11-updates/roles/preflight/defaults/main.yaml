@@ -1,0 +1,24 @@
+---
+# roles/preflight/defaults/main.yaml
+#
+# Comprobaciones previas de SOLO LECTURA. No instala, no descarga, no reinicia y no
+# modifica servicios. Valida lo que los demás roles necesitan bajo la identidad real
+# con la que AWX se conecta a Windows.
+
+# Espacio libre mínimo (GB) en la unidad del sistema; por debajo, la comprobación falla.
+preflight_min_free_gb: 10
+
+# Versión mínima de PowerShell (major.minor) del intérprete efectivo del módulo de Ansible.
+preflight_min_powershell_version: "5.1"
+
+# Si es true, que WinGet no funcione bajo esta identidad es un FALLO (bloquea las demás
+# fases). Si es false, es una advertencia: Windows Update puede seguir; las fases de
+# aplicaciones quedarán reportadas con su propia clasificación.
+preflight_require_winget: false
+
+# Tiempo máximo (segundos) por cada llamada a winget del preflight.
+preflight_winget_timeout_seconds: 90
+
+# Si es true, el rol falla al final cuando el estado es 'failed'. Si es false solo lo
+# reporta y deja que `reporting` y la puerta del playbook decidan.
+preflight_fail_on_error: false

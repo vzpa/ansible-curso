@@ -65,21 +65,25 @@ function Invoke-Winget {
   }
 }
 
-# WinGet presenta resultados en columnas. Se divide por dos o más espacios y se
-# busca el campo ID exacto; no se depende del nombre localizado de los encabezados.
+# WinGet puede emitir una o varias separaciones entre columnas según la versión,
+# el idioma y el ancho de consola. Se localiza el ID como token exacto y se
+# reconstruye el nombre con todos los tokens anteriores; no se depende de los
+# encabezados localizados ni de que las columnas estén alineadas con varios espacios.
 function Find-PackageRow {
   param([string]$Output, [string]$ExactId)
   foreach ($line in ($Output -split "`r?`n")) {
-    $parts = @($line.Trim() -split '\s{2,}' | Where-Object { $_ -ne '' })
+    $trimmed = $line.Trim()
+    if (-not $trimmed) { continue }
+    $parts = @($trimmed -split '\s+' | Where-Object { $_ -ne '' })
     for ($i = 0; $i -lt $parts.Count; $i++) {
       if ($parts[$i].Trim() -ieq $ExactId) {
         return [pscustomobject]@{
-          name = $(if ($i -gt 0) { $parts[$i - 1] } else { '' })
+          name = $(if ($i -gt 0) { $parts[0..($i - 1)] -join ' ' } else { '' })
           id = $parts[$i]
           installed_version = $(if ($i + 1 -lt $parts.Count) { $parts[$i + 1] } else { '' })
           available_version = $(if ($i + 2 -lt $parts.Count) { $parts[$i + 2] } else { '' })
           source = $(if ($i + 3 -lt $parts.Count) { $parts[$i + 3] } else { '' })
-          raw_line = $line.Trim()
+          raw_line = $trimmed
         }
       }
     }

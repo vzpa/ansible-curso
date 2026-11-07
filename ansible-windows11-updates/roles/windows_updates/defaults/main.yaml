@@ -47,8 +47,7 @@ windows_updates_post_reboot_timeout: 300
 
 # Log del módulo en Windows (el rol crea el directorio si indicas la ruta).
 # Vacío = sin log en el cliente. Ej.: 'C:\Logs\ansible_updates\win_updates.log'
-windows_updates_log_path: ""
-
+windows_updates_log_path: 'C:\Logs\ansible_updates\win_updates.log'
 # Si el módulo falla en la tarea programada (Task Scheduler), ejecutar con become SYSTEM.
 windows_updates_use_become: false
 

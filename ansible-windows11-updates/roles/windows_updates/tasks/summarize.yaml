@@ -2,8 +2,8 @@
 # roles/windows_updates/tasks/summarize.yaml
 #
 # Lógica pura (no toca Windows): convierte los retornos de win_updates en
-#   windows_updates_results -> lista de dicts {id, classification, title, kb, categories, guid, error}
-#   windows_updates_summary -> dict {mode, status (ok|partial|failed), found, installed, ...}
+#   windows_updates_results -> lista de dicts {id, classification, title, kb, categories, guid, error, detail}
+#   windows_updates_summary -> dict {mode, status (ok|partial|failed), found, filtered, installed, ...}
 # Contrato consumido por el rol `reporting`.
 #
 # Clasificación por actualización (solo estado reportado por el módulo, no texto):
@@ -11,11 +11,17 @@
 #   installed        -> installed=true y sin fallo
 #   failed           -> el módulo devolvió failure_hresult_code/failure_msg
 #   not_installed    -> encontrada, no instalada y sin fallo (p. ej. reinicio pendiente)
+#   filtered         -> el catálogo la ofrece pero el alcance configurado la descarta
+#                       (p. ej. drivers). INFORMATIVA: no degrada el estado ni cuenta en 'total'.
+#                       Se toma de `filtered_updates` del módulo (state: searched).
 # Estado:
 #   failed  -> búsqueda o instalación fallaron, o hay actualizaciones con fallo
 #   partial -> reinicio pendiente, quedan actualizaciones, verificación posterior fallida
 #              o hay actualizaciones sin instalar
 #   ok      -> en caso contrario (en modo check, hallazgos NO degradan el estado)
+#
+# NOTA (2026-11-07): `found` es el número que PASA el filtro (found_update_count). Un equipo con
+# solo drivers pendientes mostraba found=0 y parecía al día. Ahora `filtered` lo hace visible.
 
 - name: windows_updates | Construir resultados por actualización
   vars:
@@ -48,6 +54,39 @@
                         else (('HRESULT ' ~ u.failure_hresult_code) if u.failure_hresult_code is defined else ''))
             } ] -%}
       {%- endfor -%}
+      {#- Actualizaciones encontradas pero descartadas por el filtro (informativas). Tolera que
+          filtered_updates sea un dict {guid: datos} o una lista de dicts con 'id'. -#}
+      {%- set fu = windows_updates_search.filtered_updates | default({}, true) -%}
+      {%- set fp = namespace(pairs=[]) -%}
+      {%- if fu is mapping -%}
+        {%- for k, v in fu.items() -%}
+          {%- set fp.pairs = fp.pairs + [[k, v]] -%}
+        {%- endfor -%}
+      {%- elif fu is sequence and fu is not string -%}
+        {%- for v in fu -%}
+          {%- set fp.pairs = fp.pairs + [[(v.id | default('?')), v]] -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {%- for pair in fp.pairs -%}
+        {%- set fkey = pair[0] -%}
+        {%- set fu_item = pair[1] -%}
+        {%- set freasons = fu_item.filtered_reasons | default(fu_item.reasons | default(fu_item.filtered_reason | default([]))) -%}
+        {%- if freasons is string -%}
+          {%- set freasons = [freasons] -%}
+        {%- endif -%}
+        {%- set fcats = fu_item.categories | default([]) -%}
+        {%- set ns.rows = ns.rows + [ {
+              'id': (fu_item.title | default(fkey)),
+              'classification': 'filtered',
+              'title': fu_item.title | default(''),
+              'kb': fu_item.kb | default([]),
+              'categories': fcats,
+              'guid': fkey,
+              'error': '',
+              'detail': 'filtrada por ' ~ (freasons | join(', ') if (freasons | length) > 0 else '(motivo no informado)')
+                        ~ ' | categorías: ' ~ (fcats | join(', '))
+            } ] -%}
+      {%- endfor -%}
       {{ ns.rows }}
 
 - name: windows_updates | Construir resumen
@@ -61,6 +100,7 @@
     _failed_count: "{{ (windows_updates_install.failed_update_count | default(0) | int) if (_install_ran | bool) else 0 }}"
     _installed_count: "{{ (windows_updates_install.installed_update_count | default(0) | int) if (_install_ran | bool) else 0 }}"
     _not_installed: "{{ windows_updates_results | selectattr('classification', 'equalto', 'not_installed') | list | length }}"
+    _filtered_rows: "{{ windows_updates_results | selectattr('classification', 'equalto', 'filtered') | list }}"
     _remaining: "{{ (windows_updates_post.found_update_count | default(0) | int) if (_post_ok | bool) else 0 }}"
     _rebooted: "{{ (_install_ran | bool) and (windows_updates_install.rebooted | default(false) | bool) }}"
     _install_reboot_pending: >-
@@ -84,8 +124,10 @@
       {{ {
         'mode': windows_updates_mode,
         'status': _status,
-        'total': windows_updates_results | length,
+        'total': (windows_updates_results | length) - (_filtered_rows | length),
         'found': windows_updates_search.found_update_count | default(0) | int,
+        'filtered': _filtered_rows | length,
+        'filtered_titles': _filtered_rows | map(attribute='title') | list,
         'installed': _installed_count | int,
         'failed': _failed_count | int,
         'remaining': _remaining | int,

@@ -45,6 +45,7 @@ application_updates_problem_classes:
   - upgrade_unverified
   - blocked_by_process
   - upgrade_not_applicable   
+  - verify_failed
 
 # Clasificaciones que indican fallo del motor (estado 'failed' en vez de 'partial').
 application_updates_engine_failure_classes:
@@ -66,12 +67,17 @@ application_updates_apps:
   - ElectronicArts.EADesktop
   - id: ElementLabs.LMStudio
     stop_processes: ["LM Studio", "LMStudio"]
-  - id: EpicGames.EpicGamesLauncher
-    stop_processes: ["EpicGamesLauncher", "EpicWebHelper", "UnrealEngineLauncher"]
-  - EpicGames.EpicOnlineServices
+  # EpicGamesLauncher: se actualiza desde el propio launcher. La actualización silenciosa por WinGet lo dejó sin
+  # Portal\Binaries\Win64\EpicGamesLauncher.exe (job 175). Para reactivarlo, usa verify_paths:
+  #   verify_paths: ['%ProgramFiles%\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe']
+  # - id: EpicGames.EpicGamesLauncher
+    # stop_processes: ["EpicGamesLauncher", "EpicWebHelper", "UnrealEngineLauncher"]
+  # EpicOnlineServices: 0x8A15008E UPDATE_INSTALL_TECHNOLOGY_MISMATCH; lo gestiona Epic Games Launcher.
+  # - EpicGames.EpicOnlineServices
   - Git.Git
   - Google.Chrome.EXE            # el ID real NO es Google.Chrome
-  - Google.PlayGames
+  # Google.PlayGames: desajuste de versiones (26.x instalada vs 157.x ofrecida); el upgrade devuelve 0 y no cambia nada.
+  # - Google.PlayGames
   - Guru3D.RTSS
   - Hashicorp.Vagrant
   - Intel.IntelDriverAndSupportAssistant
@@ -83,7 +89,8 @@ application_updates_apps:
   - Ollama.Ollama
   - OpenAI.ChatGPT
   - Oracle.VirtualBox
-  - Perplexity.Comet
+  # Perplexity.Comet: upgrade_not_applicable (-1978335189); la versión nueva no aplica a este sistema.
+  # - Perplexity.Comet
   - PuTTY.PuTTY
   - Python.Python.3.10
   - Python.PythonInstallManager

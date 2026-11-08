@@ -25,6 +25,14 @@
 # en sesión interactiva). Por eso 'upgrade_not_applicable' es un resultado honesto, no un error
 # del script: WinGet no ofrece un modo "simulación" fiable para saberlo antes.
 #
+# NOTA (2026-11-08): VERIFICACIÓN POSTERIOR (VerifyPaths). Caso real: Epic Games Launcher.
+# winget upgrade devolvió rc 0 y la lista ya no lo mostraba como pendiente (=> 'upgraded'),
+# pero el ejecutable Portal\Binaries\Win64\EpicGamesLauncher.exe no existía y el launcher no
+# abría. WinGet no sabe si el programa quedó utilizable. Si la app declara `verify_paths`
+# (rutas de archivos que DEBEN existir tras actualizar; admiten variables de entorno como
+# %ProgramFiles%), se comprueban después del upgrade; si falta alguna => 'verify_failed'.
+# No hay reparación automática: reinstalar es decisión del operador.
+#
 # El resultado incluye `detail` con los rc de cada paso para que el LOG del job los muestre sin
 # abrir el artefacto (el stdout/stderr crudo sigue en before/check/upgrade/after/post_check).
 #
@@ -39,12 +47,14 @@ param(
   [string[]]$ProcessNames = @(),
   [string]$CloseProcesses = 'false',
   [string]$ForceClose = 'false',
-  [int]$GraceSeconds = 20
+  [int]$GraceSeconds = 20,
+  [string[]]$VerifyPaths = @()
 )
 $ErrorActionPreference = 'Stop'
 
 # Ignora elementos vacíos (p. ej. una lista vacía serializada como cadena vacía).
 $ProcessNames = @($ProcessNames | Where-Object { $_ -and "$_".Trim() })
+$VerifyPaths  = @($VerifyPaths  | Where-Object { $_ -and "$_".Trim() })
 
 # win_powershell marca changed=true por defecto; se activa solo si hay evidencia de cambio.
 $Ansible.Changed = $false
@@ -113,6 +123,21 @@ function Get-ListState {
   return 'other_rc'
 }
 
+# Comprueba que existan las rutas declaradas (solo lectura). Devuelve una lista de
+# {path (ya expandida), exists}.
+function Test-VerifyPaths {
+  param([string[]]$Paths)
+  $out = @()
+  foreach ($p in $Paths) {
+    $expanded = [Environment]::ExpandEnvironmentVariables($p)
+    $out += [pscustomobject]@{
+      path   = $expanded
+      exists = [bool](Test-Path -LiteralPath $expanded)
+    }
+  }
+  return $out
+}
+
 function Stop-AppProcesses {
   param([string[]]$Names, [bool]$Force, [int]$Grace)
   $info = [ordered]@{ found = @(); closed_gracefully = @(); force_killed = @(); still_running = @() }
@@ -163,6 +188,11 @@ try {
   if ($Source -notmatch '^(winget|msstore)$') { throw "Source inválido: $Source" }
   foreach ($n in $ProcessNames) {
     if ($n -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._\-]*$') { throw "Nombre de proceso inválido: $n" }
+  }
+  foreach ($vp in $VerifyPaths) {
+    # Solo rutas absolutas (con o sin variables de entorno) y sin comodines.
+    if ($vp -match '[\*\?]') { throw "verify_paths no admite comodines: $vp" }
+    if ($vp -notmatch '^(%[A-Za-z0-9_()]+%|[A-Za-z]:)[\\/]') { throw "verify_paths debe ser una ruta absoluta: $vp" }
   }
 
   $wg = Find-Winget
@@ -220,6 +250,15 @@ try {
           if ($res.upgrade.rc -eq 0 -and $postState -eq 'no_match') {
             $res.classification = 'upgraded'
             $Ansible.Changed = $true
+            # Verificación de archivos (solo si la app declaró verify_paths).
+            if ($VerifyPaths.Count -gt 0) {
+              $res.verify = @(Test-VerifyPaths -Paths $VerifyPaths)
+              $missing = @($res.verify | Where-Object { -not $_.exists })
+              if ($missing.Count -gt 0) {
+                # El paquete cambió (Changed=true), pero el programa no quedó utilizable.
+                $res.classification = 'verify_failed'
+              }
+            }
           } elseif ($res.upgrade.rc -eq 0 -and $postState -eq 'match') {
             $res.classification = 'still_outdated'
           } elseif ($res.upgrade.rc -eq 0) {
@@ -256,7 +295,12 @@ try {
   foreach ($k in @('before_state', 'check_state', 'post_state')) {
     if ($res.Contains($k)) { $states += "$k=$($res[$k])" }
   }
-  $res.detail = ('rc: ' + ($parts -join ' ') + ' | ' + ($states -join ' ')).Trim()
+  $d = ('rc: ' + ($parts -join ' ') + ' | ' + ($states -join ' ')).Trim()
+  if ($res.Contains('verify')) {
+    $vt = @($res.verify | ForEach-Object { "$($_.path)=$(if ($_.exists) { 'existe' } else { 'FALTA' })" })
+    $d += ' | verify: ' + ($vt -join '; ')
+  }
+  $res.detail = $d
 } catch { }
 
 $Ansible.Result = $res

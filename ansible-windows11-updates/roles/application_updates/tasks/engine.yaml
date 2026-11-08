@@ -20,6 +20,14 @@
 #   _close_processes, _force_close, _grace_seconds, _fail_on_error,
 #   _problem_classes, _failure_classes, _result_prefix
 #
+# Campos opcionales por app (entradas de _apps con forma de diccionario):
+#   id              ID exacto de WinGet (obligatorio)
+#   source          winget | msstore (por defecto _default_source)
+#   stop_processes  Procesos a cerrar si close_processes está activo
+#   verify_paths    Rutas de archivos que DEBEN existir tras actualizar (admiten variables de
+#                   entorno como %ProgramFiles%). Si falta alguna => clasificación
+#                   'verify_failed'. Sin verify_paths no se comprueba nada.
+#
 # Publica (con el prefijo winget_engine_result_prefix):
 #   <prefijo>_results -> lista de dicts por app (contrato de `reporting`)
 #   <prefijo>_summary -> dict {mode, status (ok|partial|failed), total, problems, ...}
@@ -70,7 +78,8 @@
               'id': ((a.id if (a is mapping) else a) | string | trim),
               'source': ((a.source | default(winget_engine_default_source)) if (a is mapping)
                          else winget_engine_default_source),
-              'stop_processes': ((a.stop_processes | default([])) if (a is mapping) else [])
+              'stop_processes': ((a.stop_processes | default([])) if (a is mapping) else []),
+              'verify_paths': ((a.verify_paths | default([])) if (a is mapping) else [])
             } ] -%}
       {%- endfor -%}
       {{ ns.rows }}
@@ -84,6 +93,11 @@
 - name: winget_engine | Validar la lista de aplicaciones
   vars:
     _all_ids: "{{ winget_engine_all_apps | map(attribute='id') | list }}"
+    _bad_verify: >-
+      {{ winget_engine_all_apps
+         | rejectattr('verify_paths', 'sequence') | list
+         + winget_engine_all_apps
+         | selectattr('verify_paths', 'string') | list }}
   ansible.builtin.assert:
     that:
       - _all_ids | length > 0
@@ -93,10 +107,12 @@
       - (winget_engine_all_apps | map(attribute='source') | difference(['winget', 'msstore']) | length) == 0
       - (winget_engine_limit_ids | difference(_all_ids) | length) == 0
       - winget_engine_effective_apps | length > 0
+      - _bad_verify | length == 0
     fail_msg: >-
       Lista de aplicaciones inválida: debe tener al menos una entrada, sin IDs vacíos,
-      duplicados ni comodines; las fuentes deben ser winget|msstore y
-      winget_engine_limit_ids solo puede contener IDs presentes en la lista.
+      duplicados ni comodines; las fuentes deben ser winget|msstore;
+      winget_engine_limit_ids solo puede contener IDs presentes en la lista; y verify_paths,
+      si se define, debe ser una lista (no una cadena).
     quiet: true
 
 - name: winget_engine | Mostrar alcance efectivo
@@ -106,6 +122,7 @@
       - "Aplicaciones ({{ winget_engine_effective_apps | length }}): {{ winget_engine_effective_apps | map(attribute='id') | join(', ') }}"
       - "Cierre de procesos: {{ winget_engine_close_processes | bool }} | Forzado: {{ winget_engine_force_close | bool }}"
       - "Timeout por invocación: {{ winget_engine_timeout_seconds }} s"
+      - "Con verificación de archivos (verify_paths): {{ winget_engine_effective_apps | selectattr('verify_paths') | map(attribute='id') | list }}"
 
 - name: winget_engine | Evaluar cada aplicación
   ansible.windows.win_powershell:
@@ -119,6 +136,7 @@
       CloseProcesses: "{{ winget_engine_close_processes | bool }}"
       ForceClose: "{{ winget_engine_force_close | bool }}"
       GraceSeconds: "{{ winget_engine_grace_seconds | int }}"
+      VerifyPaths: "{{ item.verify_paths }}"
     depth: 4
   loop: "{{ winget_engine_effective_apps }}"
   loop_control:

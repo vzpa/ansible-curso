@@ -61,7 +61,7 @@ application_updates_engine_failure_classes:
 application_updates_apps:
   - 7zip.7zip
   - AppWork.JDownloader
-  - Baidu.TeraBox
+  #- Baidu.TeraBox
   - CPUID.HWMonitor
   - ElectronicArts.EADesktop
   - id: ElementLabs.LMStudio

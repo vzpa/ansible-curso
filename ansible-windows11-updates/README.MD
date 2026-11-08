@@ -4,11 +4,10 @@ Gestor de actualizaciones de un Windows 11 independiente, ejecutado desde **AWX*
 Cubre Windows Update, aplicaciones y componentes Microsoft (WinGet) con un flujo
 **consulta → confirmación → instalación** y un informe estructurado por job.
 
-> **Estado honesto de la validación.** Todo lo de este repositorio pasó `yamllint`,
-> `ansible-playbook --syntax-check` y pruebas con **resultados simulados** (no contra un
-> Windows real). Lo que depende de AWX y de Windows (WinGet bajo la identidad de AWX,
-> códigos de salida reales, categorías de Windows Update de tu equipo, reinicios) está
-> **pendiente de validar** con la primera ejecución real. Ver [Qué está probado](#qué-está-probado).
+> **Estado de la validación (actualizado 2026-11-08).** El proyecto se probó en un AWX real contra
+> un Windows 11 real (VZPAW11) con consultas, instalaciones limitadas y una instalación de driver.
+> Lo que NO se ha probado en real (reinicio automático, cierre de procesos, la rama de fallo de
+> `verify_paths`, categorías extra, etc.) está marcado en [Qué está probado](#qué-está-probado).
 
 ## Principios
 
@@ -18,6 +17,8 @@ Cubre Windows Update, aplicaciones y componentes Microsoft (WinGet) con un flujo
   versión, sin cierre de procesos, respetando WSUS/política (`server_selection: default`).
 - **Evidencia, no texto.** Se guardan `rc`, stdout y stderr por paso y se verifica el resultado
   después; no se declara éxito por frases localizadas como "Upgraded".
+- **Un `rc 0` no basta.** Tras actualizar se vuelve a consultar WinGet y, si la app declara
+  `verify_paths`, se comprueba que sus archivos existan.
 - **Ningún resultado global "correcto" si falla una fase crítica.**
 - **Sin secretos en Git, logs ni informes.** Ver [docs/SECURITY.md](docs/SECURITY.md).
 
@@ -51,8 +52,20 @@ En AWX se seleccionan como `ansible-windows11-updates/<playbook>.yaml`.
 2. **`check_updates.yaml`** — consulta Windows Update (`state: searched`) y WinGet. No instala ni reinicia.
    Ejecuta `preflight` primero y se detiene si este falla.
 3. Revisar el informe. Solo entonces:
-4. **`update_windows11.yaml`** con `update_manager_confirm: INSTALL`. Primera vez: limitar el
-   alcance (`application_updates_limit_ids`, `ms_components_limit_ids`) y dejar el reinicio apagado.
+4. **`update_windows11.yaml`** con `update_manager_confirm: INSTALL`. Para una app concreta, limitar
+   con `application_updates_limit_ids` y **cerrar antes esa app** (una app abierta puede dejar el
+   upgrade a medias: `still_outdated`). Dejar el reinicio apagado salvo que se decida lo contrario.
+
+### Uso mensual
+
+| Paso | Plantilla de AWX | Extra vars |
+|---|---|---|
+| 1. Consultar | WU Manager - Consulta | ninguna |
+| 2. Si hay pendientes, cerrar las apps abiertas y continuar | WU Manager - Instalacion | `update_manager_confirm: INSTALL` |
+| 3. Leer el informe | — | lo que no esté en `upgraded` o `up_to_date` necesita atención |
+
+La guía de todas las extra vars (con ejemplos, riesgo y estado de verificación) está en el
+libro `guia_extra_vars_windows11_update_manager.xlsx` que se entrega aparte.
 
 ## Playbooks
 
@@ -71,8 +84,8 @@ Cada fase se puede desactivar: `update_manager_run_preflight`, `..._windows_upda
 | Rol | Qué hace | Publica |
 |---|---|---|
 | `preflight` | 9 comprobaciones de solo lectura (PowerShell, identidad/admin, SO, servicios, reinicio pendiente, disco, políticas de Windows Update, sesión interactiva, WinGet) | `preflight_results`, `preflight_summary` |
-| `windows_updates` | Busca; instala solo en modo `install`; reinicio opcional; nueva búsqueda para verificar | `windows_updates_results`, `windows_updates_summary` |
-| `application_updates` | Evalúa/actualiza cada app por ID exacto, con timeout propio y verificación posterior | `application_updates_results`, `application_updates_summary` |
+| `windows_updates` | Busca; instala solo en modo `install`; reinicio opcional; nueva búsqueda para verificar. Las actualizaciones que el catálogo ofrece pero el alcance descarta (p. ej. drivers) salen como filas `filtered` | `windows_updates_results`, `windows_updates_summary` |
+| `application_updates` | Evalúa/actualiza cada app por ID exacto, con timeout propio, verificación posterior y `verify_paths` opcional | `application_updates_results`, `application_updates_summary` |
 | `ms_components` | Igual, para componentes Microsoft. No cierra procesos | `ms_components_results`, `ms_components_summary` |
 | `reporting` | Calcula el estado global y publica `update_manager_report_<host>` | artefacto de AWX (`set_stats`) |
 
@@ -88,17 +101,51 @@ AWX pensada para una fase no se cuele en otra. **No definas `winget_engine_*` en
 | `update_manager_continue_on_failure` | `false` | Salta las puertas de preflight/Windows Update |
 | `windows_updates_reboot` | `false` | Reinicio automático |
 | `windows_updates_extra_categories` | `[]` | Categorías además de Security, Critical, Definition y Rollups |
-| `windows_updates_include_drivers` / `_feature_packs` / `_upgrades` | `false` | Opt-in explícito |
+| `windows_updates_include_drivers` / `_feature_packs` / `_upgrades` | `false` | Opt-in explícito. Con drivers, `windows_updates_skip_optional` debe ser `false` |
+| `windows_updates_accept_list` / `_reject_list` | `[]` | Filtra por título o KB. **Cada entrada es una expresión regular**: escapa `(`, `)` y `.` y usa comillas simples |
 | `windows_updates_use_become` | `false` | Ejecutar `win_updates` como SYSTEM si la tarea programada falla |
 | `windows_updates_log_path` | vacío | Log del módulo en Windows (opcional) |
 | `application_updates_limit_ids` / `ms_components_limit_ids` | `[]` | Limitar a estos IDs |
 | `application_updates_close_processes` / `_force_close` | `false` | Cierre ordenado / forzado de procesos (opt-in) |
 | `preflight_require_winget` | `false` | Si `true`, que WinGet no funcione es un fallo |
 | `preflight_min_free_gb` | `10` | Espacio libre mínimo en la unidad del sistema |
-| `reporting_include_raw_output` | `false` | Incluir stdout/stderr crudo en el artefacto |
+| `reporting_include_raw_output` | `false` | Incluir stdout/stderr crudo en el artefacto (solo en el artefacto, no en el log) |
 
 Las listas de apps y componentes están en `roles/application_updates/defaults/main.yaml` y
 `roles/ms_components/defaults/main.yaml`, con IDs tomados de tu `winget list`.
+
+### Apps de la lista con `verify_paths`
+
+Cada app puede declarar archivos que deben existir tras actualizar:
+
+```yaml
+- id: Ejemplo.App
+  verify_paths:
+    - '%ProgramFiles%\Ejemplo\app.exe'
+```
+
+Si falta alguno, la app queda como `verify_failed` (entra en los problemas). No hay reparación
+automática: reinstalar es decisión del operador.
+
+### Apps excluidas a propósito (con nota en el defaults)
+
+| App | Motivo |
+|---|---|
+| `Baidu.TeraBox`, `Perplexity.Comet` | `upgrade_not_applicable` (`-1978335189`): WinGet las lista pero la versión no aplica al sistema |
+| `EpicGames.EpicOnlineServices` | `0x8A15008E` `UPDATE_INSTALL_TECHNOLOGY_MISMATCH`; lo gestiona Epic Games Launcher |
+| `Google.PlayGames` | Desajuste de esquema de versión (26.x instalada vs 157.x ofrecida): el upgrade devuelve 0 y no cambia nada |
+| `EpicGames.EpicGamesLauncher` | La actualización silenciosa por WinGet lo dejó sin su `.exe` principal (job 175); se actualiza desde el propio launcher |
+
+## Clasificaciones por app
+
+| Clasificación | Significado |
+|---|---|
+| `up_to_date` / `update_available` | Al día / hay versión nueva (consulta) |
+| `upgraded` | Se actualizó y la verificación posterior lo confirmó |
+| `still_outdated` | `rc 0` pero sigue pendiente (app abierta o desajuste de versiones) |
+| `upgrade_not_applicable` | La versión ofrecida no aplica a este sistema |
+| `verify_failed` | Se actualizó pero falta un archivo declarado en `verify_paths` |
+| `other_rc`, `timeout`, `blocked_by_process`, `not_installed`, `winget_not_found`, `script_error` | Ver [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 
 ## Resultado global del informe
 
@@ -110,19 +157,25 @@ Las listas de apps y componentes están en `roles/application_updates/defaults/m
 
 Si el resultado es `fallido`, el job termina como `failed` **después** de publicar el informe.
 El informe está en el log del job ("INFORME update-manager") y en el artefacto
-`update_manager_report_<host>`.
+`update_manager_report_<host>`. Cada app de WinGet incluye una línea
+`rc: before=… check=… upgrade=… after=… post_check=…` con los códigos de salida reales.
 
 ## Qué está probado
 
 | Prueba | Estado |
 |---|---|
-| `yamllint` y `--syntax-check` de los 5 roles y 3 playbooks (ansible-core 2.15, `ansible.windows` 2.4.0) | Hecho |
-| Sintaxis de los 2 scripts PowerShell y ausencia de construcciones exclusivas de PowerShell 7 | Hecho (con PowerShell 7 como parser; **no** es un intérprete 5.1) |
+| `yamllint` y `--syntax-check` de los roles y playbooks (ansible-core 2.15, `ansible.windows` 2.4.0) | Hecho |
 | Guardas de confirmación y de entrada | Hecho |
-| Lógica de resumen, puertas y `reporting` con resultados **simulados** | Hecho |
-| Scripts PowerShell contra un `winget` falso en Linux (ramas de decisión) | Hecho; no valida los códigos reales de WinGet |
-| `winget` y permisos bajo la identidad de AWX; códigos de salida reales | **Pendiente (AWX + Windows)** |
-| Categorías reales de Windows Update, instalación y reinicio | **Pendiente (AWX + Windows)** |
+| Preflight, consulta e informe en AWX contra el Windows 11 real | **Hecho (real)** |
+| Detección de pendientes por fila de ID de WinGet (WinGet v1.29 devuelve `rc 0` sin coincidencias) | **Hecho (real)** |
+| Actualización de apps con WinGet por ID exacto bajo la identidad de AWX (7zip, Epic Games Launcher, Telegram, ChatGPT) | **Hecho (real)**. Con ChatGPT: falló con la app abierta (`still_outdated`) y funcionó con la app cerrada |
+| Instalación puntual de un driver con `windows_updates_accept_list` (regex escapada) | **Hecho (real)** |
+| Filas `filtered` y títulos de drivers en el informe | **Hecho (real)** |
+| Componentes Microsoft en modo upgrade | Hecho (real) solo con todo al día; sin actualización pendiente real |
+| `verify_paths` / `verify_failed` | Sintaxis hecha; la rama de fallo y la de éxito **no se han ejercitado en real** (ninguna app de la lista lo declara hoy) |
+| Reinicio automático (`windows_updates_reboot`) | **No probado** |
+| Cierre de procesos ordenado y forzado | **No probado** (y es probable que el cierre ordenado no funcione con apps de otra sesión) |
+| `server_selection` distinto de `default`, categorías extra, `reject_list`, feature packs, upgrades | **No probado** |
 | Carpeta `tests/` automatizada en el repo | No creada |
 
 ## Migración desde el proyecto heredado
@@ -137,11 +190,12 @@ El informe está en el log del job ("INFORME update-manager") y en el artefacto
 | `roles/winget_updates/` | `roles/application_updates/` |
 | `roles/reporting/main.yaml` | `roles/reporting/tasks/main.yaml` |
 
-Eliminar `playbook.yaml`, `vars.yaml` y `roles/winget_updates/` **solo después** de una consulta
-real satisfactoria. Hasta entonces, el Job Template antiguo ("Actualizar windows 11") apunta al
-playbook heredado, que instala y reinicia: no lo ejecutes.
+Eliminar `playbook.yaml`, `vars.yaml` y `roles/winget_updates/` **solo después** de comprobar que no
+los usa ningún Job Template. El Job Template antiguo ("Actualizar windows 11"), si sigue
+existiendo, apunta al playbook heredado, que instala y reinicia: no lo ejecutes.
 
 ## Rollback
 
 Los cambios del repositorio se revierten con `git revert`. Las actualizaciones ya instaladas en
-Windows **no** tienen rollback automatizado (ver [docs/SECURITY.md](docs/SECURITY.md)).
+Windows **no** tienen rollback automatizado (ver [docs/SECURITY.md](docs/SECURITY.md)). Un driver
+mal instalado se revierte desde el Administrador de dispositivos.

@@ -44,6 +44,7 @@ application_updates_problem_classes:
   - still_outdated
   - upgrade_unverified
   - blocked_by_process
+  - upgrade_not_applicable   
 
 # Clasificaciones que indican fallo del motor (estado 'failed' en vez de 'partial').
 application_updates_engine_failure_classes:

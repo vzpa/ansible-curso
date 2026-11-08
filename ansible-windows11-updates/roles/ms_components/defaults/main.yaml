@@ -57,7 +57,7 @@ ms_components_problem_classes:
   - still_outdated
   - upgrade_unverified
   - blocked_by_process
-
+  - upgrade_not_applicable  
 # Clasificaciones que indican fallo del motor (estado 'failed' en vez de 'partial').
 ms_components_engine_failure_classes:
   - winget_not_found

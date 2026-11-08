@@ -7,10 +7,18 @@
 # Garantías:
 #   - Nunca usa `--all`.
 #   - No depende de texto localizado de WinGet: se guardan rc, stdout y stderr crudos.
+#     La presencia de un paquete se decide buscando una FILA con el ID exacto (token) en
+#     stdout; no se interpretan frases como "No se encontró ningún paquete" ni "Upgraded".
 #   - Solo cierra procesos si CloseProcesses=true Y hay ProcessNames Y hay una
 #     actualización disponible Y Mode=upgrade. Primero intenta cierre ordenado;
 #     Stop-Process -Force solo se usa si ForceClose=true.
 #   - No modifica nada en modo 'check'.
+#
+# CORRECCIÓN (2026-11-07): con winget v1.29 `list --upgrade-available --id X --exact`
+# devuelve rc=0 AUNQUE no haya coincidencias (evidencia: Git.Git en el equipo). Decidir solo
+# por el rc generaba falsos positivos (todo salía 'update_available'). Ahora:
+#   rc 0 + fila con el ID en stdout  -> el paquete está en esa lista
+#   rc 0 + sin fila                  -> no coincide (igual que RC_NO_MATCH)
 #
 # Códigos de salida de WinGet usados SOLO como pista (validar en el host real):
 #   -1978335212 (0x8A150014) = sin coincidencias
@@ -71,6 +79,30 @@ function Invoke-Winget {
   } finally {
     Remove-Item -LiteralPath $o, $e -Force -ErrorAction SilentlyContinue
   }
+}
+
+# ¿Hay una fila cuyo token sea exactamente el ID? (independiente del idioma de WinGet)
+function Test-IdRow {
+  param([string]$Text, [string]$Id)
+  if (-not $Text) { return $false }
+  foreach ($line in ($Text -split '\r?\n')) {
+    foreach ($tok in ($line -split '\s+')) {
+      if ($tok -ieq $Id) { return $true }
+    }
+  }
+  return $false
+}
+
+# Interpreta una llamada `winget list ...`: 'timeout' | 'match' | 'no_match' | 'other_rc'
+function Get-ListState {
+  param($Call, [string]$Id)
+  if ($Call.timed_out) { return 'timeout' }
+  if ($Call.rc -eq $RC_NO_MATCH) { return 'no_match' }
+  if ($Call.rc -eq 0) {
+    if (Test-IdRow -Text $Call.stdout -Id $Id) { return 'match' }
+    return 'no_match'
+  }
+  return 'other_rc'
 }
 
 function Stop-AppProcesses {
@@ -139,16 +171,19 @@ try {
     $res.before = Invoke-Winget $wg (@('list') + $common) $TimeoutSeconds
     $res.check  = Invoke-Winget $wg (@('list', '--upgrade-available') + $common) $TimeoutSeconds
 
-    if ($res.before.timed_out -or $res.check.timed_out) {
+    $beforeState = Get-ListState $res.before $PackageId
+    $checkState  = Get-ListState $res.check  $PackageId
+    $res.before_state = $beforeState
+    $res.check_state  = $checkState
+
+    if ($beforeState -eq 'timeout' -or $checkState -eq 'timeout') {
       $res.classification = 'timeout'
-    } elseif ($res.before.rc -eq $RC_NO_MATCH) {
+    } elseif ($beforeState -eq 'no_match') {
       $res.classification = 'not_installed'
-    } elseif ($res.before.rc -ne 0) {
+    } elseif ($beforeState -eq 'other_rc' -or $checkState -eq 'other_rc') {
       $res.classification = 'other_rc'
-    } elseif ($res.check.rc -eq $RC_NO_MATCH) {
+    } elseif ($checkState -eq 'no_match') {
       $res.classification = 'up_to_date'
-    } elseif ($res.check.rc -ne 0) {
-      $res.classification = 'other_rc'
     } else {
       $res.classification = 'update_available'
     }
@@ -171,15 +206,22 @@ try {
           # Verificación posterior independiente (no depende del texto de WinGet).
           $res.after      = Invoke-Winget $wg (@('list') + $common) $TimeoutSeconds
           $res.post_check = Invoke-Winget $wg (@('list', '--upgrade-available') + $common) $TimeoutSeconds
-          if ($res.upgrade.rc -eq 0 -and $res.post_check.rc -eq $RC_NO_MATCH) {
+          $postState = Get-ListState $res.post_check $PackageId
+          $res.post_state = $postState
+
+          if ($res.upgrade.rc -eq 0 -and $postState -eq 'no_match') {
             $res.classification = 'upgraded'
             $Ansible.Changed = $true
-          } elseif ($res.upgrade.rc -eq 0 -and $res.post_check.rc -eq 0) {
+          } elseif ($res.upgrade.rc -eq 0 -and $postState -eq 'match') {
             $res.classification = 'still_outdated'
           } elseif ($res.upgrade.rc -eq 0) {
             $res.classification = 'upgrade_unverified'
           } elseif ($res.upgrade.rc -eq $RC_NO_UPDATE) {
-            $res.classification = 'up_to_date'
+            # La consulta vio una actualización pero winget upgrade dice "no aplicable":
+            # NO es 'up_to_date'. Es una discrepancia que hay que investigar (p. ej. el
+            # paquete se ve en la lista pero el instalador/fuente no es aplicable a esta
+            # sesión o identidad). Se conserva rc/stdout/stderr en before/check/upgrade.
+            $res.classification = 'upgrade_not_applicable'
           } else {
             $res.classification = 'other_rc'
           }

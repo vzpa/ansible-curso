@@ -20,6 +20,14 @@
 #   rc 0 + fila con el ID en stdout  -> el paquete está en esa lista
 #   rc 0 + sin fila                  -> no coincide (igual que RC_NO_MATCH)
 #
+# NOTA (2026-11-07): `list --upgrade-available` puede listar un paquete cuya versión nueva NO se
+# aplica a este sistema (evidencia: Baidu.TeraBox; `winget upgrade` devuelve -1978335189 también
+# en sesión interactiva). Por eso 'upgrade_not_applicable' es un resultado honesto, no un error
+# del script: WinGet no ofrece un modo "simulación" fiable para saberlo antes.
+#
+# El resultado incluye `detail` con los rc de cada paso para que el LOG del job los muestre sin
+# abrir el artefacto (el stdout/stderr crudo sigue en before/check/upgrade/after/post_check).
+#
 # Códigos de salida de WinGet usados SOLO como pista (validar en el host real):
 #   -1978335212 (0x8A150014) = sin coincidencias
 #   -1978335189 (0x8A15002B) = sin actualización aplicable
@@ -218,9 +226,8 @@ try {
             $res.classification = 'upgrade_unverified'
           } elseif ($res.upgrade.rc -eq $RC_NO_UPDATE) {
             # La consulta vio una actualización pero winget upgrade dice "no aplicable":
-            # NO es 'up_to_date'. Es una discrepancia que hay que investigar (p. ej. el
-            # paquete se ve en la lista pero el instalador/fuente no es aplicable a esta
-            # sesión o identidad). Se conserva rc/stdout/stderr en before/check/upgrade.
+            # NO es 'up_to_date'. Es una discrepancia (ver nota de cabecera). Se conserva
+            # rc/stdout/stderr en before/check/upgrade.
             $res.classification = 'upgrade_not_applicable'
           } else {
             $res.classification = 'other_rc'
@@ -233,5 +240,23 @@ try {
   $res.classification = 'script_error'
   $res.error = $_.Exception.Message
 }
+
+# Resumen de rc por paso para el log del job. Aislado: si falla, no afecta al resultado.
+try {
+  $parts = @()
+  foreach ($k in @('before', 'check', 'upgrade', 'after', 'post_check')) {
+    if ($res.Contains($k)) {
+      $c = $res[$k]
+      $v = "$($c.rc)"
+      if ($c.timed_out) { $v = 'timeout' }
+      $parts += "$k=$v"
+    }
+  }
+  $states = @()
+  foreach ($k in @('before_state', 'check_state', 'post_state')) {
+    if ($res.Contains($k)) { $states += "$k=$($res[$k])" }
+  }
+  $res.detail = ('rc: ' + ($parts -join ' ') + ' | ' + ($states -join ' ')).Trim()
+} catch { }
 
 $Ansible.Result = $res

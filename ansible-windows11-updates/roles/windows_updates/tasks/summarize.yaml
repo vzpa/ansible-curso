@@ -22,6 +22,10 @@
 #
 # NOTA (2026-11-07): `found` es el número que PASA el filtro (found_update_count). Un equipo con
 # solo drivers pendientes mostraba found=0 y parecía al día. Ahora `filtered` lo hace visible.
+#
+# NOTA (2026-11-08): el `id` mostrado en el informe es el KB si existe; si no (p. ej. drivers, que
+# no traen KB), ahora es el TÍTULO de la actualización y no su GUID. El GUID sigue disponible en
+# el campo `guid`.
 
 - name: windows_updates | Construir resultados por actualización
   vars:
@@ -44,7 +48,7 @@
         {%- endif -%}
         {%- set kb = u.kb | default([]) -%}
         {%- set ns.rows = ns.rows + [ {
-              'id': (('KB' ~ kb[0]) if (kb | length) > 0 else key),
+              'id': (('KB' ~ kb[0]) if (kb | length) > 0 else (u.title | default(key, true))),
               'classification': cls,
               'title': u.title | default(''),
               'kb': kb,

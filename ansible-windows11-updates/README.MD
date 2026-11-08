@@ -199,3 +199,4 @@ existiendo, apunta al playbook heredado, que instala y reinicia: no lo ejecutes.
 Los cambios del repositorio se revierten con `git revert`. Las actualizaciones ya instaladas en
 Windows **no** tienen rollback automatizado (ver [docs/SECURITY.md](docs/SECURITY.md)). Un driver
 mal instalado se revierte desde el Administrador de dispositivos.
+#sync w11 & linux

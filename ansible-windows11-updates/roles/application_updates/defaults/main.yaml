@@ -107,7 +107,7 @@ application_updates_apps:
 # Apps de tu lista original que NO se pueden gestionar por ID de WinGet en este equipo
 # (aparecen con ID `ARP\...` o `MSIX\...`, es decir, WinGet no las correlaciona):
 #   Brave, Mozilla Firefox, WinSCP, Npcap, NoxPlayer, MSI Afterburner, VMware Workstation,
-#   Ubisoft Connect (no aparece instalado), NVIDIA App/driver, ASUS/Armoury Crate, McAfee.
+#   Ubisoft Connect (no aparece instalado), NVIDIA App/driver, ASUS/Armoury Crate.
 # Candidatos con ID incompleto o ambiguo en tu listado (completa con `winget list --id ...`):
 #   - LibreHardwareMonitor.LibreHardware...  (ID truncado en la salida)
 #   - Python.Launcher                        (aparece dos veces: 3.13.5 y '< 3.10.8')
